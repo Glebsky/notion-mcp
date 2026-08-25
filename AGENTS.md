@@ -13,22 +13,23 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
 - **Authentication**: HTTP Authorization header (`Authorization: Bearer <API_KEY>`) or `x-api-key: <API_KEY>`
 
 ```
-┌─────────────────────────────────┐
-│     AI Agent (e.g. Notion)      │
-└────────────────┬────────────────┘
-                 │  Streamable HTTP (JSON-RPC / MCP)
-                 ▼
-┌─────────────────────────────────┐
-│       Ngrok / Reverse Proxy     │
-└────────────────┬────────────────┘
-                 │
-┌────────────────▼────────────────┐
-│   Notion Terminal MCP Server    │
-│  - Timing-Safe Authentication   │
-│  - Host Header Validation       │
-│  - Sandboxed / Full Access FS   │
-│  - Process Tree Manager         │
-└─────────────────────────────────┘
+┌────────────────────────────────────────┐
+│        AI Agent (e.g. Notion)          │
+└───────────────────┬────────────────────┘
+                    │  Streamable HTTP (JSON-RPC / MCP)
+                    ▼
+┌────────────────────────────────────────┐
+│          Ngrok / Public Tunnel         │
+└───────────────────┬────────────────────┘
+                    │
+┌───────────────────▼────────────────────┐
+│      Notion Terminal MCP Server        │
+│  - Timing-Safe Authentication          │
+│  - Host Header Validation              │
+│  - Sandboxed / Full Access FS          │
+│  - UTF-8 Windows Console Integration   │
+│  - Structured Audit Logging            │
+└────────────────────────────────────────┘
 ```
 
 ---
@@ -53,7 +54,7 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
 ## 3. Tool Specifications
 
 ### 3.1 `terminal_execute`
-Execute a terminal command on the host (PowerShell or cmd.exe).
+Execute a terminal command on the host (PowerShell or cmd.exe) with native UTF-8 encoding.
 
 #### Input Schema
 | Parameter | Type | Required | Default | Description |
@@ -76,21 +77,66 @@ Execute a terminal command on the host (PowerShell or cmd.exe).
 }
 ```
 
-#### Operational Guidelines for Agents
-- Prefer `shell: "powershell"` for modern scripts, JSON manipulation, and file searches.
-- In PowerShell, avoid interactive commands that block awaiting stdin (e.g., interactive prompts, `Read-Host`, nano, vim).
-- Output is truncated at `MAX_OUTPUT_BYTES`. If `truncated: true`, direct output to a temporary file and read with `file_read` using `offset`.
+---
+
+### 3.2 `file_search`
+Search files by glob pattern (e.g., `*.ts`) and/or search for text/regex inside file contents (Grep).
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `path` | `string` | Yes | - | Base directory to search within. |
+| `pattern` | `string` | No | - | Filename glob pattern (e.g. `*.ts`, `*config*`). |
+| `query` | `string` | No | - | Substring or regex pattern to search within files. |
+| `case_sensitive` | `boolean` | No | `false` | Case sensitive search matching. |
+| `max_results` | `number` | No | `100` | Maximum number of matches to return (max: 1,000). |
+
+#### Response Format
+```json
+{
+  "root": "C:\\workspace\\project",
+  "results": [
+    {
+      "path": "C:\\workspace\\project\\src\\config.ts",
+      "line": 15,
+      "snippet": "const PORT = integerEnv(\"PORT\", 3000);"
+    }
+  ],
+  "truncated": false
+}
+```
 
 ---
 
-### 3.2 `file_read`
+### 3.3 `file_replace`
+Replace an exact block of code or text inside a file without rewriting the entire file.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `path` | `string` | Yes | - | Path to the target file. |
+| `target` | `string` | Yes | - | Exact string/block of code to replace. |
+| `replacement` | `string` | Yes | - | Replacement string/block of code. |
+| `allow_multiple` | `boolean` | No | `false` | Allow replacing multiple occurrences across the file. |
+
+#### Response Format
+```json
+{
+  "path": "C:\\workspace\\project\\src\\config.ts",
+  "replacements": 1
+}
+```
+
+---
+
+### 3.4 `file_read`
 Read text or binary files with optional chunking/offset.
 
 #### Input Schema
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `path` | `string` | Yes | - | Path to the file. |
-| `encoding` | `"utf8" \| "base64"` | No | `"utf8"` | Content encoding ("utf8" for code/text, "base64" for binaries/images). |
+| `encoding` | `"utf8" \| "base64"` | No | `"utf8"` | Content encoding ("utf8" for text, "base64" for binaries). |
 | `offset` | `number` | No | `0` | Byte offset to begin reading. |
 | `length` | `number` | No | `MAX_FILE_BYTES` | Maximum number of bytes to read. |
 
@@ -109,7 +155,7 @@ Read text or binary files with optional chunking/offset.
 
 ---
 
-### 3.3 `file_write`
+### 3.5 `file_write`
 Create, overwrite, or append content to a file. Missing parent directories are created automatically.
 
 #### Input Schema
@@ -131,7 +177,7 @@ Create, overwrite, or append content to a file. Missing parent directories are c
 
 ---
 
-### 3.4 `file_list`
+### 3.6 `file_list`
 List files and subdirectories in a directory path.
 
 #### Input Schema
@@ -141,68 +187,29 @@ List files and subdirectories in a directory path.
 | `recursive` | `boolean` | No | `false` | Scan directory recursively. |
 | `max_entries` | `number` | No | `500` | Max entries to return (max: 10,000). |
 
-#### Response Format
-```json
-{
-  "root": "C:\\workspace\\project",
-  "entries": [
-    {
-      "path": "C:\\workspace\\project\\package.json",
-      "type": "file",
-      "size": 1024
-    },
-    {
-      "path": "C:\\workspace\\project\\src",
-      "type": "directory"
-    }
-  ],
-  "truncated": false
-}
-```
-
 ---
 
-### 3.5 `file_stat`
-Inspect file or directory metadata.
+### 3.7 `file_stat`
+Inspect file or directory metadata (size, created/modified timestamps, mode).
 
 #### Input Schema
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `path` | `string` | Yes | - | Target path. |
-
-#### Response Format
-```json
-{
-  "path": "C:\\workspace\\project\\package.json",
-  "type": "file",
-  "size": 1024,
-  "created_at": "2026-08-25T08:00:00.000Z",
-  "modified_at": "2026-08-25T08:30:00.000Z",
-  "mode": 33206
-}
-```
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | Yes | Target path to inspect. |
 
 ---
 
-### 3.6 `file_mkdir`
+### 3.8 `file_mkdir`
 Create a directory and all missing parent directories.
 
 #### Input Schema
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `path` | `string` | Yes | - | Path of directory to create. |
-
-#### Response Format
-```json
-{
-  "path": "C:\\workspace\\project\\src\\components",
-  "created": true
-}
-```
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | Yes | Path of directory to create. |
 
 ---
 
-### 3.7 `file_move`
+### 3.9 `file_move`
 Move or rename a file or directory.
 
 #### Input Schema
@@ -212,17 +219,9 @@ Move or rename a file or directory.
 | `destination` | `string` | Yes | - | Destination path. |
 | `overwrite` | `boolean` | No | `false` | Overwrite destination if it already exists. |
 
-#### Response Format
-```json
-{
-  "source": "C:\\workspace\\project\\old_name.ts",
-  "destination": "C:\\workspace\\project\\new_name.ts"
-}
-```
-
 ---
 
-### 3.8 `file_delete`
+### 3.10 `file_delete`
 Delete a file or directory.
 
 #### Input Schema
@@ -231,48 +230,15 @@ Delete a file or directory.
 | `path` | `string` | Yes | - | Path to delete. |
 | `recursive` | `boolean` | No | `false` | Set to `true` to delete non-empty directories. |
 
-#### Response Format
-```json
-{
-  "path": "C:\\workspace\\project\\temp.log",
-  "deleted": true
-}
-```
-
 ---
 
-## 4. Error Handling Protocol
+## 4. Agent Best Practices & Recommended Workflows
 
-When a tool fails, the response has `isError: true` with a formatted error message in JSON:
+### 1. Code Editing Workflow
+- **Search first**: Use `file_search` with `query` to locate the exact file and line number containing relevant functions or classes.
+- **Inspect**: Use `file_read` to inspect surrounding code context.
+- **Targeted Edits**: Use `file_replace` with a distinct surrounding chunk of code to perform edits cleanly without rewriting entire files.
 
-```json
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "{\n  \"error\": \"Access denied: path is outside sandbox directory\"\n}"
-    }
-  ],
-  "isError": true
-}
-```
-
-### Common Error Codes & Recovery Strategies
-1. **Access denied (Outside sandbox)**: Check configured `FILES_ROOT` or work within current relative directory.
-2. **Command Timed Out (`timedOut: true`)**: Split heavy operations into background scripts, smaller tasks, or pass an explicit `timeout_ms`.
-3. **Truncated Output (`truncated: true`)**: Paginate output using `file_read` with `offset` and `length`.
-4. **Refusing to delete filesystem root**: Safety check preventing accidental deletion of root drives (`C:\`, `/`).
-
----
-
-## 5. Agent Workflow Recommendations
-
-### Reading Large Codebases
-1. Call `file_list` with `recursive: false` to understand repository structure.
-2. Target specific directories rather than performing unbounded recursive listings.
-3. Use `file_read` for individual files. If `size > 1,000,000`, read in segments via `offset`.
-
-### Executing Terminal Tasks
-1. Verify prerequisites before executing scripts (e.g. check if `node`, `python`, `git` are installed).
-2. For long build commands, check `exitCode === 0`.
-3. Read `stderr` even if `exitCode === 0` to catch non-fatal warnings and diagnostic info.
+### 2. Terminal Commands
+- UTF-8 encoding is enabled by default for both PowerShell and cmd.exe. Cyrillic and multilingual characters are preserved properly.
+- Long-running commands automatically terminate after `COMMAND_TIMEOUT_MS` along with any spawned child processes.

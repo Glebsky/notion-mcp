@@ -128,7 +128,9 @@ See [AGENT_SPEC.md](AGENT_SPEC.md) for full JSON schemas, parameters, and return
 
 | Tool | Description |
 |---|---|
-| `terminal_execute` | Execute PowerShell or cmd commands with cwd and timeout options. |
+| `terminal_execute` | Execute PowerShell or cmd commands with UTF-8 encoding and timeout options. |
+| `file_search` | Search files by name glob (`*.ts`) and/or search for text/regex inside files (Grep). |
+| `file_replace` | Safely replace an exact block of code or text in a file without rewriting it completely. |
 | `file_read` | Read file contents (UTF-8 or Base64) with offset pagination for large files. |
 | `file_write` | Create, overwrite, or append content to files (creates missing directories). |
 | `file_list` | List directory contents recursively or flat with file sizes. |
@@ -136,6 +138,7 @@ See [AGENT_SPEC.md](AGENT_SPEC.md) for full JSON schemas, parameters, and return
 | `file_mkdir` | Create directories recursively. |
 | `file_move` | Move or rename files and directories. |
 | `file_delete` | Safely delete files or directories (`recursive: true` required for directories). |
+
 
 ---
 
