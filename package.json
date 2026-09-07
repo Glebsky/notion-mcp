@@ -4,11 +4,18 @@
   "private": true,
   "type": "module",
   "description": "Authenticated remote MCP server exposing terminal and filesystem tools to Notion Custom Agents.",
+  "main": "dist-desktop/main/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build:server": "tsc -p tsconfig.json",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:server && npm run build:electron && npm run build:renderer",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "check": "tsc -p tsconfig.json --noEmit",
+    "app:dev": "concurrently -k -n \"vite,electron\" -c \"cyan,magenta\" \"vite\" \"electron .\"",
+    "app:start": "npm run build && electron .",
+    "package:exe": "npm run build && electron-builder --win",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.desktop.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\""
   },
   "engines": {
@@ -22,9 +29,21 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@types/express": "^5.0.3",
     "@types/node": "^24.1.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
+    "lucide-react": "^1.41.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite": "^8.2.2"
   }
 }

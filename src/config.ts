@@ -1,6 +1,13 @@
-import "dotenv/config";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import dotenv from "dotenv";
+
+if (process.env.DOTENV_PATH) {
+  dotenv.config({ path: process.env.DOTENV_PATH });
+} else {
+  dotenv.config();
+}
+
 
 function integerEnv(name: string, fallback: number): number {
   const parsed = Number.parseInt(process.env[name] || "", 10);

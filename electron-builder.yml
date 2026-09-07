@@ -1,0 +1,25 @@
+appId: com.notionmcp.terminal
+productName: Notion Terminal MCP
+directories:
+  output: release
+files:
+  - dist/**/*
+  - dist-desktop/**/*
+  - dist-renderer/**/*
+  - desktop/icon.svg
+  - package.json
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+    - target: nsis
+      arch:
+        - x64
+  icon: desktop/icon.svg
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Notion Terminal MCP

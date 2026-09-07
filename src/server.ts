@@ -22,6 +22,19 @@ export function createApp(): Express {
   app.disable("x-powered-by");
   app.use(express.json({ limit: "2mb" }));
 
+  // Root endpoint info
+  app.get("/", (_req, res) => {
+    res.json({
+      name: "Notion Terminal MCP Server",
+      status: "running",
+      protocol: "Model Context Protocol (Streamable HTTP)",
+      mcp_endpoint: "/mcp",
+      health_endpoint: "/health",
+      auth_required: true,
+      auth_type: "Bearer Token",
+    });
+  });
+
   // Health check endpoint
   app.get("/health", (_req, res) => {
     res.json({
@@ -30,6 +43,7 @@ export function createApp(): Express {
       full_access: config.fullAccess,
     });
   });
+
 
   // Streamable HTTP MCP endpoint
   app.all("/mcp", validateHost, authenticate, async (req, res) => {

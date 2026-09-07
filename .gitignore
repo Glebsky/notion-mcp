@@ -1,6 +1,10 @@
 node_modules/
 dist/
+dist-desktop/
+dist-renderer/
+release/
 .env
+
 .env.*
 !.env.example
 *.log
@@ -9,5 +13,6 @@ tools/
 workspace/
 .idea/
 .vscode/
+
 
 

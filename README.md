@@ -9,11 +9,16 @@ An authenticated, production-ready remote **Model Context Protocol (MCP)** serve
 
 Includes built-in zero-config public tunneling via the official **Ngrok Node.js SDK** (`@ngrok/ngrok`).
 
+📖 **Документация на русском языке доступна в [USER_GUIDE_RU.md](USER_GUIDE_RU.md)**.
+🤖 **Agent Specifications & JSON Schemas available in [AGENTS.md](AGENTS.md)**.
+
 ---
 
 ## Features
 
+- 🖥️ **Liquid Glass Desktop GUI App**: Modern Electron + React desktop interface with live status cards, real-time audit log stream, one-click Notion credentials copy, and visual settings editor.
 - ⚡ **Streamable HTTP Transport**: Modern MCP server implementation running on Express.
+
 - 🌐 **Built-in Ngrok Tunnel**: Expose your local MCP server to Notion with a single command (`npm run start` or `npm run dev`) using `@ngrok/ngrok`.
 - 💻 **Terminal Execution**: Execute PowerShell or cmd commands with configurable timeouts, working directories, and recursive process tree termination.
 - 📁 **Filesystem Operations**: Full set of tools for reading, writing, moving, listing, statting, and deleting files and directories.
@@ -189,11 +194,14 @@ notion-terminal-mcp/
 
 ## NPM Scripts
 
-- `npm run build` — Compile TypeScript to `dist/`.
-- `npm run start` — Run production server from `dist/index.js`.
-- `npm run dev` — Run development server with `tsx watch`.
-- `npm run check` — Type-check TypeScript without emitting files.
+- `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI).
+- `npm run app:dev` — Launch the Desktop App in live development mode with hot-reload.
+- `npm run build` — Compile TypeScript server, Electron scripts, and React renderer.
+- `npm run start` — Run headless MCP server from `dist/index.js` (CLI mode).
+- `npm run dev` — Run headless MCP server with `tsx watch` (CLI dev mode).
+- `npm run check` — Type-check TypeScript codebase without emitting files.
 - `npm run token` — Generate a cryptographically secure random token for `MCP_API_KEY`.
+
 
 ---
 
