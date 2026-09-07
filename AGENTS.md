@@ -232,6 +232,41 @@ Delete a file or directory.
 
 ---
 
+### 3.11 `workspace_get_cwd`
+Get the current active working directory and root directory path.
+
+#### Input Schema
+*(No parameters)*
+
+#### Response Format
+```json
+{
+  "cwd": "C:\\OSPanel\\home\\sandustry",
+  "files_root": "C:\\OSPanel\\home"
+}
+```
+
+---
+
+### 3.12 `workspace_set_cwd`
+Change the active working directory for subsequent file operations and terminal commands (e.g. switch to `"sandustry"`). Allows using short relative paths within that project.
+
+#### Input Schema
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | Yes | Subdirectory name (e.g. `"sandustry"`) or path to set as current working directory. |
+
+#### Response Format
+```json
+{
+  "cwd": "C:\\OSPanel\\home\\sandustry",
+  "files_root": "C:\\OSPanel\\home",
+  "message": "Active working directory switched to: C:\\OSPanel\\home\\sandustry"
+}
+```
+
+---
+
 ## 4. Agent Best Practices & Recommended Workflows
 
 ### 1. Code Editing Workflow
@@ -242,3 +277,8 @@ Delete a file or directory.
 ### 2. Terminal Commands
 - UTF-8 encoding is enabled by default for both PowerShell and cmd.exe. Cyrillic and multilingual characters are preserved properly.
 - Long-running commands automatically terminate after `COMMAND_TIMEOUT_MS` along with any spawned child processes.
+
+### 3. Relative Paths & Multi-Project Workspaces
+- You can freely use short relative paths like `src/index.ts`, `sandustry/src/index.ts`, or `./package.json`.
+- The server automatically resolves relative paths against the active project folder.
+- Use `workspace_set_cwd(path: "project_name")` or pass `cwd` in `terminal_execute` or inspect a directory with `file_list` / `file_search` to switch the active project directory at any time.

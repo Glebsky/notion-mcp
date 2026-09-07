@@ -15,6 +15,8 @@
     "app:dev": "concurrently -k -n \"vite,electron\" -c \"cyan,magenta\" \"vite\" \"electron .\"",
     "app:start": "npm run build && electron .",
     "package:exe": "npm run build && electron-builder --win",
+    "package:portable": "npm run build && electron-builder --win portable",
+    "package:installer": "npm run build && electron-builder --win nsis",
     "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.desktop.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\""
   },

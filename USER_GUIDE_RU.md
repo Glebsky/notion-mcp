@@ -62,11 +62,17 @@ npm install
 Copy-Item .env.example .env
 npm run token # выведет готовый криптостойкий ключ для вставки в .env
 
-# 3. Сборка TypeScript
+# 3. Сборка TypeScript и запуск CLI-сервера
 npm run build
-
-# 4. Запуск сервера
 npm run start
+
+# 4. Запуск графического Desktop приложения (Electron)
+npm run app:start
+
+# 5. Сборка самостоятельных .exe файлов в папку release/
+npm run package:portable   # Чисто Portable .exe (без установки)
+npm run package:installer  # Чисто Установщик (Setup wizard)
+npm run package:exe        # Собрать оба варианта сразу
 ```
 
 ---

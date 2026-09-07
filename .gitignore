@@ -9,7 +9,8 @@ release/
 !.env.example
 *.log
 *.exe
-tools/
+/tools/
+!src/tools/
 workspace/
 .idea/
 .vscode/

@@ -194,13 +194,31 @@ notion-terminal-mcp/
 
 ## NPM Scripts
 
-- `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI).
+- `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI) for local use/testing without packaging into exe.
 - `npm run app:dev` — Launch the Desktop App in live development mode with hot-reload.
+- `npm run package:portable` — Build a standalone **Portable `.exe`** (no installation required). Output: `release/Notion Terminal MCP <version>-portable.exe`.
+- `npm run package:installer` — Build a Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/Notion Terminal MCP <version>.exe`.
+- `npm run package:exe` — Build **both** Portable and Installer executable packages at once.
 - `npm run build` — Compile TypeScript server, Electron scripts, and React renderer.
 - `npm run start` — Run headless MCP server from `dist/index.js` (CLI mode).
 - `npm run dev` — Run headless MCP server with `tsx watch` (CLI dev mode).
 - `npm run check` — Type-check TypeScript codebase without emitting files.
 - `npm run token` — Generate a cryptographically secure random token for `MCP_API_KEY`.
+
+---
+
+## Packaging Executables (.exe)
+
+When you need standalone Windows binaries (`.exe`), run:
+
+| Command | Target | Output in `release/` |
+|---|---|---|
+| `npm run package:portable` | Portable single executable | `Notion Terminal MCP <version>-portable.exe` |
+| `npm run package:installer` | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `Notion Terminal MCP <version>.exe` |
+| `npm run package:exe` | Both targets (Portable + Installer) | Both files above |
+
+> [!NOTE]
+> `npm run app:start` only compiles TypeScript and runs Electron live in development/test mode. It does **not** create `.exe` files in `release/`. To generate `.exe` binaries, always use the `npm run package:*` commands.
 
 
 ---
