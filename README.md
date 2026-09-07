@@ -28,7 +28,7 @@ Includes built-in zero-config public tunneling via the official **Ngrok Node.js 
   - **Full Host Mode (`FULL_ACCESS=true`)**: Unrestricted access when you need full host automation.
   - **Timing-Safe Auth**: Constant-time comparison (`crypto.timingSafeEqual`) for Bearer tokens and API keys.
   - **Host Header Validation**: Prevents DNS rebinding and unauthorized host header spoofing.
-- 🤖 **Agent-First Design**: Detailed specifications and JSON schemas optimized for AI models ([AGENT_SPEC.md](AGENT_SPEC.md)).
+- 🤖 **Agent-First Design**: Detailed specifications and JSON schemas optimized for AI models ([AGENTS.md](AGENTS.md)).
 
 ---
 
@@ -111,40 +111,78 @@ Authentication Header:
 ============================================================
 ```
 
+#### Alternative: Free Cloudflare Quick Tunnel (No Account Required)
+
+If you don't have an Ngrok account, run:
+
+```powershell
+.\start-public.ps1
+```
+
+This PowerShell script automatically:
+1. Downloads and validates the official Authenticode-signed `cloudflared` binary into `tools/`.
+2. Compiles TypeScript (`npm run build`).
+3. Starts the MCP server on `http://127.0.0.1:3000`.
+4. Spawns an ephemeral Cloudflare tunnel (`https://<random-subdomain>.trycloudflare.com`).
+5. Prints the ready-to-copy Notion endpoint (`https://<random>.trycloudflare.com/mcp`) and `Authorization` header.
+
 ---
 
 ## Connecting to Notion Custom Agents
 
-1. In Notion, open **Settings & members** → **Connections** (or open your **Notion Agent configuration**).
+1. In Notion, open **Settings & members** → **Connections** (or open your **Notion Custom Agent** settings).
 2. Add a new **Custom MCP Connection**.
 3. Set **Server URL** to:
    ```text
-   https://your-domain.ngrok-free.app/mcp
+   https://your-tunnel-url/mcp
    ```
+   *(e.g., `https://your-domain.ngrok-free.app/mcp` or `https://xyz.trycloudflare.com/mcp`)*
 4. Set **Authentication**:
    - Header Name: `Authorization`
-   - Header Value: `Bearer <YOUR_MCP_API_KEY>`
-5. Test the connection. Notion will automatically discover all 7 tools (`terminal_execute`, `file_read`, `file_write`, `file_list`, `file_stat`, `file_mkdir`, `file_move`, `file_delete`).
+   - Header Value: `Bearer <YOUR_MCP_API_KEY>` (or use `x-api-key: <YOUR_MCP_API_KEY>`)
+5. Test the connection. Notion will automatically discover all **20 tools** across terminal execution, filesystem operations, workspace navigation, and host browser automation.
 
 ---
 
-## Available MCP Tools
+## Available MCP Tools (20 Tools)
 
-See [AGENT_SPEC.md](AGENT_SPEC.md) for full JSON schemas, parameters, and return types.
+See [AGENTS.md](AGENTS.md) for full JSON schemas, input parameters, response formats, and agent best practices.
 
+### 🖥️ Terminal Execution
 | Tool | Description |
 |---|---|
-| `terminal_execute` | Execute PowerShell or cmd commands with UTF-8 encoding and timeout options. |
-| `file_search` | Search files by name glob (`*.ts`) and/or search for text/regex inside files (Grep). |
-| `file_replace` | Safely replace an exact block of code or text in a file without rewriting it completely. |
-| `file_read` | Read file contents (UTF-8 or Base64) with offset pagination for large files. |
-| `file_write` | Create, overwrite, or append content to files (creates missing directories). |
-| `file_list` | List directory contents recursively or flat with file sizes. |
-| `file_stat` | Inspect file/directory metadata (size, created/modified timestamps, mode). |
-| `file_mkdir` | Create directories recursively. |
-| `file_move` | Move or rename files and directories. |
-| `file_delete` | Safely delete files or directories (`recursive: true` required for directories). |
+| `terminal_execute` | Execute PowerShell or cmd.exe commands on the host with native UTF-8 encoding, configurable timeouts, custom `cwd`, and process tree termination. |
 
+### 📁 Filesystem Operations
+| Tool | Description |
+|---|---|
+| `file_search` | Search files by glob pattern (`*.ts`) and/or search text/regex within file contents (grep). |
+| `file_replace` | Safely replace an exact block of code or text in a file without rewriting the entire file. |
+| `file_read` | Read file contents (UTF-8 text or Base64 binary) with offset pagination for large files. |
+| `file_write` | Create, overwrite, or append content to files (automatically creates missing parent directories). |
+| `file_list` | List directory contents recursively or flat with file sizes and directory metadata. |
+| `file_stat` | Inspect file/directory metadata (size, created/modified timestamps, permissions). |
+| `file_mkdir` | Create directories and any missing parent directories recursively. |
+| `file_move` | Move or rename files and directories, with optional destination overwrite. |
+| `file_delete` | Permanently delete files or directories (`recursive: true` required for non-empty directories). |
+
+### 🗂️ Workspace Management
+| Tool | Description |
+|---|---|
+| `workspace_get_cwd` | Inspect the current active working directory and base `files_root` path. |
+| `workspace_set_cwd` | Switch the active working directory for subsequent commands and relative path resolution (e.g. switch to a project subdirectory). |
+
+### 🌐 Host Browser Automation
+| Tool | Description |
+|---|---|
+| `browser_open` | Launch host browser (Google Chrome or Microsoft Edge) and navigate to a URL. Opens visible window by default (`headless: false`) for visual live testing. |
+| `browser_navigate` | Navigate the active browser tab to a new URL with custom wait conditions (`load`, `domcontentloaded`, `networkidle0`). |
+| `browser_evaluate` | Execute arbitrary JavaScript expressions or async functions inside the page context and return the JSON result. |
+| `browser_click` | Click an element on the webpage matching a CSS selector. |
+| `browser_type` | Type text into an input or textarea element on the active page, with optional field clearing. |
+| `browser_get_content` | Extract rendered text, raw DOM HTML, or page title from the document or a specific CSS selector. |
+| `browser_screenshot` | Capture full-page or viewport screenshots to a PNG file or return base64. |
+| `browser_close` | Close the active browser instance and all open tabs cleanly. |
 
 ---
 
@@ -171,40 +209,55 @@ See [AGENT_SPEC.md](AGENT_SPEC.md) for full JSON schemas, parameters, and return
 
 ```
 notion-terminal-mcp/
-├── src/
-│   ├── config.ts              # Type-safe environment and validation
-│   ├── index.ts               # Server entry point & lifecycle
-│   ├── server.ts              # Express setup & MCP Streamable HTTP endpoint
+├── desktop/                   # Electron + React Liquid Glass Desktop GUI
+│   ├── index.html             # Desktop app HTML entrypoint
+│   └── src/
+│       ├── main/              # Electron main process (lifecycle, system tray, IPC)
+│       │   ├── index.ts       # BrowserWindow & tray menu initialization
+│       │   ├── preload.ts     # Context bridge IPC definitions
+│       │   └── server-manager.ts # Background MCP server runner & log parser
+│       └── renderer/          # React + Tailwind CSS UI components
+│           ├── App.tsx        # Liquid Glass UI state & layout
+│           ├── components/    # Notion card, controls, log viewer, settings modal
+│           └── styles/        # Liquid glass visual styles & animations
+├── src/                       # Headless MCP Server (Node.js / Express)
+│   ├── config.ts              # Type-safe environment, defaults & validation
+│   ├── index.ts               # Server CLI entry point & lifecycle
+│   ├── server.ts              # Express HTTP server & MCP Streamable HTTP endpoint
 │   ├── middleware/
-│   │   ├── auth.ts            # Timing-safe token authentication
-│   │   └── host.ts            # Host header validation
-│   ├── tools/
+│   │   ├── auth.ts            # Timing-safe token & API key authentication
+│   │   └── host.ts            # Host header validation & DNS rebinding guard
+│   ├── tools/                 # 20 MCP Tools
+│   │   ├── browser.ts         # Puppeteer-core browser automation manager
 │   │   ├── command.ts         # Process tree management & execution
 │   │   ├── filesystem.ts      # Sandboxed filesystem CRUD operations
 │   │   ├── index.ts           # MCP tool registrations
 │   │   └── types.ts           # MCP result helpers & interfaces
 │   └── tunnel/
 │       └── ngrok.ts           # Ngrok SDK manager & Notion connection banner
-├── AGENT_SPEC.md              # Technical specification for AI Agents
+├── AGENTS.md                  # Detailed AI Agent Specification & JSON schemas
+├── USER_GUIDE_RU.md           # Comprehensive Russian documentation & guide
+├── electron-builder.yml       # Windows packaging configuration (Portable + NSIS)
 ├── package.json
-├── tsconfig.json
-└── setup.ps1                  # PowerShell initial setup script
+├── setup.ps1                  # PowerShell initial environment setup script
+├── start-public.ps1           # Zero-config Cloudflare Quick Tunnel launcher
+└── tsconfig*.json
 ```
 
 ---
 
 ## NPM Scripts
 
-- `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI) for local use/testing without packaging into exe.
-- `npm run app:dev` — Launch the Desktop App in live development mode with hot-reload.
-- `npm run package:portable` — Build a standalone **Portable `.exe`** (no installation required). Output: `release/Notion Terminal MCP <version>-portable.exe`.
-- `npm run package:installer` — Build a Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/Notion Terminal MCP <version>.exe`.
+- `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI) for local testing without packaging.
+- `npm run app:dev` — Launch the Desktop App in live development mode with hot-reload (Vite + Electron).
+- `npm run package:portable` — Build a standalone **Portable `.exe`** (no installation required). Output: `release/Notion Terminal MCP <version>.exe`.
+- `npm run package:installer` — Build a Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/Notion Terminal MCP Setup <version>.exe`.
 - `npm run package:exe` — Build **both** Portable and Installer executable packages at once.
-- `npm run build` — Compile TypeScript server, Electron scripts, and React renderer.
+- `npm run build` — Compile TypeScript server, Electron main/preload, and Vite React renderer.
 - `npm run start` — Run headless MCP server from `dist/index.js` (CLI mode).
 - `npm run dev` — Run headless MCP server with `tsx watch` (CLI dev mode).
-- `npm run check` — Type-check TypeScript codebase without emitting files.
-- `npm run token` — Generate a cryptographically secure random token for `MCP_API_KEY`.
+- `npm run check` — Type-check all TypeScript configurations (server, desktop, electron).
+- `npm run token` — Generate a cryptographically secure random 32-byte hex token for `MCP_API_KEY`.
 
 ---
 
@@ -214,8 +267,8 @@ When you need standalone Windows binaries (`.exe`), run:
 
 | Command | Target | Output in `release/` |
 |---|---|---|
-| `npm run package:portable` | Portable single executable | `Notion Terminal MCP <version>-portable.exe` |
-| `npm run package:installer` | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `Notion Terminal MCP <version>.exe` |
+| `npm run package:portable` | Portable single executable | `Notion Terminal MCP <version>.exe` |
+| `npm run package:installer` | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `Notion Terminal MCP Setup <version>.exe` |
 | `npm run package:exe` | Both targets (Portable + Installer) | Both files above |
 
 > [!NOTE]

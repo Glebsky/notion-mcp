@@ -19,7 +19,7 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
                     │  Streamable HTTP (JSON-RPC / MCP)
                     ▼
 ┌────────────────────────────────────────┐
-│          Ngrok / Public Tunnel         │
+│     Ngrok / Cloudflare Public Tunnel   │
 └───────────────────┬────────────────────┘
                     │
 ┌───────────────────▼────────────────────┐
