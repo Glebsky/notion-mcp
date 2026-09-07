@@ -33,6 +33,8 @@ const api: ElectronAPI = {
   minimizeWindow: () => ipcRenderer.send("window:minimize"),
   maximizeWindow: () => ipcRenderer.send("window:maximize"),
   closeWindow: () => ipcRenderer.send("window:close"),
+  hideToTray: () => ipcRenderer.send("window:hide-to-tray"),
+  exitApp: () => ipcRenderer.send("app:quit"),
 
   openExternal: (url: string) => ipcRenderer.send("shell:open-external", url),
 };

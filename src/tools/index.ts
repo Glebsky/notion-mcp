@@ -16,6 +16,7 @@ import {
   getActiveWorkingDir,
   setActiveWorkingDir,
 } from "./filesystem.js";
+import { browserManager } from "./browser.js";
 
 export function registerAllTools(server: McpServer): void {
   server.registerTool(
@@ -306,6 +307,168 @@ export function registerAllTools(server: McpServer): void {
           files_root: config.filesRoot,
           message: `Active working directory switched to: ${cwd}`,
         });
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_open",
+    {
+      title: "Open URL in browser",
+      description:
+        "Open a webpage in host browser (Chrome or Edge). By default launches a visible browser window (headless=false) so you can test web applications visually.",
+      inputSchema: {
+        url: z.string().min(1).describe("The URL to open (e.g. http://localhost:3000, http://127.0.0.1:8080, https://...)"),
+        headless: z.boolean().default(false).describe("If false (default), opens a real visible browser window. If true, runs headlessly."),
+        browser: z.enum(["chrome", "edge"]).default("chrome").describe("Preferred browser (defaults to Google Chrome, falls back to Microsoft Edge)"),
+      },
+    },
+    async ({ url, headless, browser }) => {
+      try {
+        const result = await browserManager.open({ url, headless, browser });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_navigate",
+    {
+      title: "Navigate to URL",
+      description: "Navigate the active browser page to a new URL.",
+      inputSchema: {
+        url: z.string().min(1).describe("Target URL to navigate to"),
+        wait_until: z.enum(["load", "domcontentloaded", "networkidle0"]).default("load").describe("Condition to wait for"),
+        timeout_ms: z.number().int().positive().max(120_000).default(30_000).describe("Navigation timeout in milliseconds"),
+      },
+    },
+    async ({ url, wait_until, timeout_ms }) => {
+      try {
+        const result = await browserManager.navigate({ url, waitUntil: wait_until, timeoutMs: timeout_ms });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_evaluate",
+    {
+      title: "Execute JavaScript in browser",
+      description:
+        "Evaluate arbitrary JavaScript code inside the active browser webpage context. Returns the evaluated value as JSON.",
+      inputSchema: {
+        script: z.string().min(1).describe("JavaScript code or expression to run (e.g. document.title, window.__STATE__, or an async function)"),
+      },
+    },
+    async ({ script }) => {
+      try {
+        const result = await browserManager.evaluate({ script });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_click",
+    {
+      title: "Click element on webpage",
+      description: "Click an HTML element matching a CSS selector in the active browser page.",
+      inputSchema: {
+        selector: z.string().min(1).describe("CSS selector of element to click (e.g. 'button.submit', '#login', 'a[href=\"/about\"]')"),
+        timeout_ms: z.number().int().positive().max(60_000).default(10_000).describe("Wait timeout for element in milliseconds"),
+      },
+    },
+    async ({ selector, timeout_ms }) => {
+      try {
+        const result = await browserManager.click({ selector, timeoutMs: timeout_ms });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_type",
+    {
+      title: "Type text into element",
+      description: "Type text into an input or textarea element on the active browser page.",
+      inputSchema: {
+        selector: z.string().min(1).describe("CSS selector of input/textarea element"),
+        text: z.string().describe("Text string to type into the element"),
+        clear: z.boolean().default(false).describe("Whether to clear existing text before typing"),
+        timeout_ms: z.number().int().positive().max(60_000).default(10_000).describe("Wait timeout for element in milliseconds"),
+      },
+    },
+    async ({ selector, text, clear, timeout_ms }) => {
+      try {
+        const result = await browserManager.type({ selector, text, clear, timeoutMs: timeout_ms });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_get_content",
+    {
+      title: "Get webpage content",
+      description: "Extract readable text, raw HTML, or title from the active webpage or a specific selector.",
+      inputSchema: {
+        type: z.enum(["text", "html", "title"]).default("text").describe("Type of content: 'text' (rendered text), 'html' (DOM HTML), or 'title'"),
+        selector: z.string().optional().describe("Optional CSS selector to target a specific container element"),
+      },
+    },
+    async ({ type, selector }) => {
+      try {
+        const result = await browserManager.getContent({ type, selector });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_screenshot",
+    {
+      title: "Take webpage screenshot",
+      description: "Capture a screenshot of the active browser page. Can save to file or return base64.",
+      inputSchema: {
+        path: z.string().optional().describe("Optional file path to save PNG screenshot to (e.g. 'screenshots/test1.png')"),
+        full_page: z.boolean().default(false).describe("Whether to capture full scrollable page or visible viewport only"),
+      },
+    },
+    async ({ path: outputPath, full_page }) => {
+      try {
+        const result = await browserManager.screenshot({ path: outputPath, fullPage: full_page });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_close",
+    {
+      title: "Close browser",
+      description: "Close the active browser instance and all tabs.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const result = await browserManager.close();
+        return textResult(result);
       } catch (error) {
         return errorResult(error);
       }

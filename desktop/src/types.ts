@@ -53,10 +53,12 @@ export interface ElectronAPI {
   onStatusChange: (callback: (status: ServerStatus) => void) => () => void;
   clearLogs: () => Promise<void>;
 
-  // Window Controls
+  // Window Controls & Tray
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
+  hideToTray: () => void;
+  exitApp: () => void;
 
   // External Links / System
   openExternal: (url: string) => void;

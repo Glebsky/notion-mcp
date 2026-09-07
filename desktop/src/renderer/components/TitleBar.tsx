@@ -1,5 +1,5 @@
 import React from "react";
-import { Minus, Square, X, Terminal, Shield, Globe } from "lucide-react";
+import { Minus, Square, X, Terminal, Shield, Globe, ArrowDownToLine } from "lucide-react";
 import type { ServerStatus } from "../../types";
 
 
@@ -76,21 +76,28 @@ export const TitleBar: React.FC<TitleBarProps> = ({ status, onOpenSettings }) =>
         <button
           onClick={() => window.electronAPI.minimizeWindow()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-          title="Minimize"
+          title="Свернуть на панель задач"
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
         <button
+          onClick={() => window.electronAPI.hideToTray()}
+          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors"
+          title="Свернуть в трей (скрыть с панели задач)"
+        >
+          <ArrowDownToLine className="w-3.5 h-3.5" />
+        </button>
+        <button
           onClick={() => window.electronAPI.maximizeWindow()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-          title="Maximize"
+          title="Развернуть"
         >
           <Square className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => window.electronAPI.closeWindow()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors"
-          title="Close"
+          title="Закрыть (свернуть в трей)"
         >
           <X className="w-4 h-4" />
         </button>

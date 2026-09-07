@@ -16,11 +16,12 @@ Includes built-in zero-config public tunneling via the official **Ngrok Node.js 
 
 ## Features
 
-- 🖥️ **Liquid Glass Desktop GUI App**: Modern Electron + React desktop interface with live status cards, real-time audit log stream, one-click Notion credentials copy, and visual settings editor.
+- 🖥️ **Liquid Glass Desktop GUI App**: Modern Electron + React desktop interface with system tray integration (hide from taskbar, background execution), live status cards, real-time audit log stream, one-click Notion credentials copy, and visual settings editor.
 - ⚡ **Streamable HTTP Transport**: Modern MCP server implementation running on Express.
 
 - 🌐 **Built-in Ngrok Tunnel**: Expose your local MCP server to Notion with a single command (`npm run start` or `npm run dev`) using `@ngrok/ngrok`.
 - 💻 **Terminal Execution**: Execute PowerShell or cmd commands with configurable timeouts, working directories, and recursive process tree termination.
+- 🌍 **Browser Automation**: Launch host browsers (Chrome/Edge), navigate, execute arbitrary JavaScript, click elements, fill inputs, extract DOM text/HTML, and capture screenshots.
 - 📁 **Filesystem Operations**: Full set of tools for reading, writing, moving, listing, statting, and deleting files and directories.
 - 🔒 **Security & Sandboxing**:
   - **Sandboxed Mode (`FULL_ACCESS=false`)**: Strict path containment inside a configured `FILES_ROOT` with path traversal defense.

@@ -267,6 +267,103 @@ Change the active working directory for subsequent file operations and terminal 
 
 ---
 
+### 3.13 `browser_open`
+Open a webpage in the host browser (Chrome or Edge). By default launches a visible browser window (`headless: false`) so you can visually interact and test web applications.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `url` | `string` | Yes | - | Webpage URL (e.g. `http://localhost:3000`, `https://example.com`). |
+| `headless` | `boolean` | No | `false` | If `false`, opens a real visible browser window. If `true`, runs headlessly. |
+| `browser` | `"chrome" \| "edge"` | No | `"chrome"` | Preferred host browser (Google Chrome or Microsoft Edge). |
+
+---
+
+### 3.14 `browser_navigate`
+Navigate the active browser page to a new URL.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `url` | `string` | Yes | - | Target URL to navigate to. |
+| `wait_until` | `"load" \| "domcontentloaded" \| "networkidle0"` | No | `"load"` | Navigation wait condition. |
+| `timeout_ms` | `number` | No | `30000` | Navigation timeout in milliseconds (max: 120,000). |
+
+---
+
+### 3.15 `browser_evaluate`
+Evaluate arbitrary JavaScript code inside the active webpage context. Returns the evaluated value as JSON.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `script` | `string` | Yes | - | JavaScript code or expression to run (e.g. `document.title`, `window.__APP_STATE__`). |
+
+#### Response Format
+```json
+{
+  "result": { "title": "Dashboard", "userCount": 42 },
+  "url": "http://localhost:3000/dashboard",
+  "title": "Dashboard"
+}
+```
+
+---
+
+### 3.16 `browser_click`
+Click an HTML element matching a CSS selector on the active page.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `selector` | `string` | Yes | - | CSS selector (e.g. `"button.submit"`, `"#login"`, `"a[href='/settings']"`). |
+| `timeout_ms` | `number` | No | `10000` | Wait timeout in milliseconds (max: 60,000). |
+
+---
+
+### 3.17 `browser_type`
+Type text into an input or textarea element on the active page.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `selector` | `string` | Yes | - | CSS selector of input/textarea. |
+| `text` | `string` | Yes | - | Text string to type into the element. |
+| `clear` | `boolean` | No | `false` | Whether to clear existing text before typing. |
+| `timeout_ms` | `number` | No | `10000` | Wait timeout in milliseconds (max: 60,000). |
+
+---
+
+### 3.18 `browser_get_content`
+Extract readable text, raw HTML, or title from the active webpage or a specific selector.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `type` | `"text" \| "html" \| "title"` | No | `"text"` | Content type to extract. |
+| `selector` | `string` | No | - | Optional CSS selector to target a specific container element. |
+
+---
+
+### 3.19 `browser_screenshot`
+Capture a screenshot of the active browser page. Can save to file or return base64.
+
+#### Input Schema
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `path` | `string` | No | - | Optional file path to save PNG screenshot to. |
+| `full_page` | `boolean` | No | `false` | Capture full scrollable page or visible viewport. |
+
+---
+
+### 3.20 `browser_close`
+Close the active browser instance and all tabs.
+
+#### Input Schema
+*(No parameters)*
+
+---
+
 ## 4. Agent Best Practices & Recommended Workflows
 
 ### 1. Code Editing Workflow
@@ -282,3 +379,10 @@ Change the active working directory for subsequent file operations and terminal 
 - You can freely use short relative paths like `src/index.ts`, `sandustry/src/index.ts`, or `./package.json`.
 - The server automatically resolves relative paths against the active project folder.
 - Use `workspace_set_cwd(path: "project_name")` or pass `cwd` in `terminal_execute` or inspect a directory with `file_list` / `file_search` to switch the active project directory at any time.
+
+### 4. Browser Automation & Live Testing
+- **Test Web Applications**: After modifying web files, open the local dev server using `browser_open(url: "http://localhost:3000")`.
+- **Inspect DOM & State**: Run `browser_evaluate(script: "document.querySelector('h1').innerText")` to verify page rendering.
+- **Form Submissions & Interaction**: Use `browser_type` to fill in inputs and `browser_click` to click buttons.
+- **Visual Verification**: Use `browser_screenshot` to confirm layouts, styles, and responsive design.
+- **Cleanup**: Call `browser_close` once your testing session is complete.
