@@ -8,8 +8,9 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
 
 - **Server Identifier**: `notion-terminal-files`
 - **Protocol**: [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-- **Transport**: Streamable HTTP (`/mcp`)
+- **Transports**: Streamable HTTP (`/mcp`) & Standard SSE (`/sse` + `/messages`)
 - **Health Check**: `GET /health`
+- **Server Info**: `GET /`
 - **Authentication**: HTTP Authorization header (`Authorization: Bearer <API_KEY>`) or `x-api-key: <API_KEY>`
 
 ```

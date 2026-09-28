@@ -5,19 +5,18 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An authenticated, production-ready remote **Model Context Protocol (MCP)** server providing **Terminal Execution** and **Filesystem Tools** to **Notion Custom Agents**, Claude, Cursor, and autonomous AI agents over **Streamable HTTP**.
+An authenticated, production-ready remote **Model Context Protocol (MCP)** server providing **Terminal Execution** and **Filesystem Tools** to **Notion Custom Agents**, Claude, Cursor, and autonomous AI agents over **Streamable HTTP** and **MCP SSE**.
 
 Includes built-in zero-config public tunneling via the official **Ngrok Node.js SDK** (`@ngrok/ngrok`).
 
-📖 **Документация на русском языке доступна в [USER_GUIDE_RU.md](USER_GUIDE_RU.md)**.
-🤖 **Agent Specifications & JSON Schemas available in [AGENTS.md](AGENTS.md)**.
+[🇬🇧 English User Guide (USER_GUIDE.md)](USER_GUIDE.md) | [🇷🇺 Руководство на русском (USER_GUIDE_RU.md)](USER_GUIDE_RU.md) | [🇷🇺 Русский README (README_RU.md)](README_RU.md) | [🤖 Agent Spec (AGENTS.md)](AGENTS.md)
 
 ---
 
 ## Features
 
 - 🖥️ **Liquid Glass Desktop GUI App**: Modern Electron + React desktop interface with system tray integration (hide from taskbar, background execution), live status cards, real-time audit log stream, one-click Notion credentials copy, and visual settings editor.
-- ⚡ **Streamable HTTP Transport**: Modern MCP server implementation running on Express.
+- ⚡ **Dual MCP Transports**: Fully supports modern **Streamable HTTP** (`/mcp`) and standard **Server-Sent Events** (`/sse` + `/messages`) for maximum compatibility with Notion, Claude, Cursor, and custom clients.
 
 - 🌐 **Built-in Ngrok Tunnel**: Expose your local MCP server to Notion with a single command (`npm run start` or `npm run dev`) using `@ngrok/ngrok`.
 - 💻 **Terminal Execution**: Execute PowerShell or cmd commands with configurable timeouts, working directories, and recursive process tree termination.
@@ -78,11 +77,16 @@ NGROK_DOMAIN=your-static-name.ngrok-free.app
 # Security & Sandboxing
 FULL_ACCESS=false
 FILES_ROOT=./workspace
-ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev
+ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com
 ```
 
 ### 3. Build & Run
 
+#### Option A: Quick Windows Batch Scripts
+- Double-click **`build.bat`** to open an interactive Windows build menu (Portable .exe, Setup installer, both, unpacked dir, or clean).
+- Double-click **`build-portable.bat`** to compile and generate `release\Notion Terminal MCP Portable.exe` in one click.
+
+#### Option B: Terminal (Node.js & npm)
 ```bash
 # Build TypeScript
 npm run build
@@ -223,7 +227,7 @@ notion-terminal-mcp/
 ├── src/                       # Headless MCP Server (Node.js / Express)
 │   ├── config.ts              # Type-safe environment, defaults & validation
 │   ├── index.ts               # Server CLI entry point & lifecycle
-│   ├── server.ts              # Express HTTP server & MCP Streamable HTTP endpoint
+│   ├── server.ts              # Express HTTP server (Streamable HTTP + MCP SSE endpoints)
 │   ├── middleware/
 │   │   ├── auth.ts            # Timing-safe token & API key authentication
 │   │   └── host.ts            # Host header validation & DNS rebinding guard
@@ -237,8 +241,12 @@ notion-terminal-mcp/
 │       └── ngrok.ts           # Ngrok SDK manager & Notion connection banner
 ├── AGENTS.md                  # Detailed AI Agent Specification & JSON schemas
 ├── USER_GUIDE_RU.md           # Comprehensive Russian documentation & guide
+├── build.bat                  # Interactive Windows build menu launcher
+├── build-portable.bat         # 1-click portable .exe builder
+├── build.ps1                  # Automated PowerShell build script (portable/installer/all/dir/clean)
 ├── electron-builder.yml       # Windows packaging configuration (Portable + NSIS)
 ├── package.json
+├── portable.txt               # Portable mode notes (stores .env & workspace next to .exe)
 ├── setup.ps1                  # PowerShell initial environment setup script
 ├── start-public.ps1           # Zero-config Cloudflare Quick Tunnel launcher
 └── tsconfig*.json
@@ -246,12 +254,28 @@ notion-terminal-mcp/
 
 ---
 
+## Windows Batch & PowerShell Build Scripts
+
+For fast execution without remembering npm commands:
+
+- **`build.bat`** — Interactive command prompt menu:
+  - `[1]` Build Portable version (`release\Notion Terminal MCP Portable.exe`)
+  - `[2]` Build Setup wizard installer (`release\Notion Terminal MCP Setup 1.0.0.exe`)
+  - `[3]` Build Both (Portable + Setup)
+  - `[4]` Unpack to `release\win-unpacked`
+  - `[5]` Clean `release/` directory
+  - Supports CLI arguments: `build.bat portable`, `build.bat installer`, `build.bat all`, `build.bat dir`, `build.bat clean`.
+- **`build-portable.bat`** — Direct double-click shortcut to build the Portable `.exe` in one step.
+- **`build.ps1`** — Underlying automated PowerShell build engine with error handling and colored logging.
+
+---
+
 ## NPM Scripts
 
 - `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI) for local testing without packaging.
 - `npm run app:dev` — Launch the Desktop App in live development mode with hot-reload (Vite + Electron).
-- `npm run package:portable` — Build a standalone **Portable `.exe`** (no installation required). Output: `release/Notion Terminal MCP <version>.exe`.
-- `npm run package:installer` — Build a Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/Notion Terminal MCP Setup <version>.exe`.
+- `npm run package:portable` — Build standalone **Portable `.exe`**. Output: `release/Notion Terminal MCP Portable.exe`.
+- `npm run package:installer` — Build Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/Notion Terminal MCP Setup 1.0.0.exe`.
 - `npm run package:exe` — Build **both** Portable and Installer executable packages at once.
 - `npm run build` — Compile TypeScript server, Electron main/preload, and Vite React renderer.
 - `npm run start` — Run headless MCP server from `dist/index.js` (CLI mode).
@@ -263,16 +287,19 @@ notion-terminal-mcp/
 
 ## Packaging Executables (.exe)
 
-When you need standalone Windows binaries (`.exe`), run:
+When you need standalone Windows binaries (`.exe`), run `build.bat`, `build-portable.bat`, or use npm:
 
-| Command | Target | Output in `release/` |
-|---|---|---|
-| `npm run package:portable` | Portable single executable | `Notion Terminal MCP <version>.exe` |
-| `npm run package:installer` | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `Notion Terminal MCP Setup <version>.exe` |
-| `npm run package:exe` | Both targets (Portable + Installer) | Both files above |
+| Command | Method | Target | Output in `release/` |
+|---|---|---|---|
+| `build-portable.bat` / `npm run package:portable` | Batch / npm | Portable single executable | `Notion Terminal MCP Portable.exe` |
+| `npm run package:installer` | Batch / npm | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `Notion Terminal MCP Setup 1.0.0.exe` |
+| `build.bat all` / `npm run package:exe` | Batch / npm | Both targets (Portable + Installer) | Both files above |
+
+> [!TIP]
+> **True Portable Mode**: When running `Notion Terminal MCP Portable.exe`, configuration (`.env`) and the `workspace/` folder are saved directly next to the executable, allowing full portability across flash drives and workstations. When installed via Setup wizard, configuration resides in `%APPDATA%\notion-terminal-mcp\config\.env`.
 
 > [!NOTE]
-> `npm run app:start` only compiles TypeScript and runs Electron live in development/test mode. It does **not** create `.exe` files in `release/`. To generate `.exe` binaries, always use the `npm run package:*` commands.
+> `npm run app:start` only compiles TypeScript and runs Electron live in development/test mode. It does **not** create `.exe` files in `release/`. To generate `.exe` binaries, always use `build.bat`, `build-portable.bat`, or `npm run package:*`.
 
 
 ---

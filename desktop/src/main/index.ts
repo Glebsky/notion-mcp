@@ -220,10 +220,31 @@ function createTray() {
   updateTrayMenu();
 }
 
-app.whenReady().then(() => {
-  const configDir = app.isPackaged
-    ? path.join(app.getPath("userData"), "config")
-    : projectRoot;
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    showMainWindow();
+  });
+
+  app.whenReady().then(() => {
+  let configDir: string;
+
+  if (app.isPackaged) {
+    // Portable mode: electron-builder sets PORTABLE_EXECUTABLE_DIR when running as portable exe
+    // In this case, store config next to the .exe instead of in userData
+    const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
+    if (portableDir) {
+      configDir = portableDir;
+    } else {
+      configDir = path.join(app.getPath("userData"), "config");
+    }
+  } else {
+    // Dev mode — use project root
+    configDir = projectRoot;
+  }
 
   serverManager = new ServerManager(projectRoot, configDir);
 
@@ -343,3 +364,5 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+}
+

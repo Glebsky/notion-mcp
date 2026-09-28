@@ -71,6 +71,10 @@ export class ServerManager {
   }
 
   public getEnvPath(): string {
+    // Allow overriding via env var — useful for pointing packaged app to project .env
+    if (process.env.NOTION_MCP_ENV_PATH) {
+      return process.env.NOTION_MCP_ENV_PATH;
+    }
     return path.join(this.configDir, ".env");
   }
 
@@ -89,7 +93,7 @@ export class ServerManager {
         `MCP_API_KEY=${defaultApiKey}`,
         `PORT=3000`,
         `HOST=127.0.0.1`,
-        `ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev`,
+        `ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com`,
         `NGROK_ENABLED=false`,
         `NGROK_AUTHTOKEN=`,
         `NGROK_DOMAIN=`,
@@ -116,7 +120,7 @@ export class ServerManager {
       NGROK_ENABLED: "false",
       NGROK_AUTHTOKEN: "",
       NGROK_DOMAIN: "",
-      ALLOWED_HOSTS: "localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev",
+      ALLOWED_HOSTS: "localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com",
       COMMAND_TIMEOUT_MS: "120000",
       MAX_OUTPUT_BYTES: "1048576",
       MAX_FILE_BYTES: "10485760",
@@ -217,6 +221,7 @@ export class ServerManager {
           ELECTRON_RUN_AS_NODE: "1",
           FORCE_COLOR: "1",
         },
+        stdio: ["pipe", "pipe", "pipe", "ipc"],
         windowsHide: true,
       });
 
@@ -261,34 +266,60 @@ export class ServerManager {
       return { success: true };
     }
 
-    this.emitLog("Stopping MCP server process...", "info");
+    this.emitLog("Stopping MCP server process gracefully...", "info");
 
     return new Promise((resolve) => {
-      if (this.process?.pid && process.platform === "win32") {
-        const killer = spawn("taskkill", ["/pid", String(this.process.pid), "/T", "/F"], {
-          windowsHide: true,
-        });
-        killer.once("close", () => {
-          this.process = null;
-          this.updateStatus({ state: "offline", ngrokUrl: undefined });
-          resolve({ success: true });
-        });
-      } else {
-        this.process?.kill("SIGTERM");
-        setTimeout(() => {
-          if (this.process) {
-            this.process.kill("SIGKILL");
+      const proc = this.process;
+      if (!proc) {
+        resolve({ success: true });
+        return;
+      }
+
+      let resolved = false;
+      const onDone = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(forceKillTimer);
+        this.process = null;
+        this.updateStatus({ state: "offline", ngrokUrl: undefined });
+        resolve({ success: true });
+      };
+
+      // Fallback: force kill after 3 seconds if graceful shutdown does not finish
+      const forceKillTimer = setTimeout(() => {
+        if (!resolved && proc.pid) {
+          this.emitLog("Graceful stop timed out, forcing termination...", "warn");
+          if (process.platform === "win32") {
+            const killer = spawn("taskkill", ["/pid", String(proc.pid), "/T", "/F"], {
+              windowsHide: true,
+            });
+            killer.once("close", onDone);
+          } else {
+            proc.kill("SIGKILL");
+            onDone();
           }
-          this.process = null;
-          this.updateStatus({ state: "offline", ngrokUrl: undefined });
-          resolve({ success: true });
-        }, 1500);
+        }
+      }, 3000);
+
+      proc.once("close", onDone);
+
+      // Try sending IPC shutdown message first
+      try {
+        if (proc.connected) {
+          proc.send({ type: "shutdown" });
+        } else {
+          proc.kill("SIGINT");
+        }
+      } catch {
+        proc.kill("SIGTERM");
       }
     });
   }
 
   public async restart(): Promise<{ success: boolean; error?: string }> {
     await this.stop();
+    // Allow OS socket and ngrok cloud release
+    await new Promise((resolve) => setTimeout(resolve, 1200));
     return await this.start();
   }
 
@@ -315,6 +346,19 @@ export class ServerManager {
       if (line.includes("Notion Terminal MCP listening on")) {
         this.updateStatus({ state: "running" });
         this.emitLog(line, "mcp");
+        continue;
+      }
+
+      // MCP session management logs — informational only
+      if (line.startsWith("[MCP]")) {
+        this.emitLog(line, "info", "general", line);
+        continue;
+      }
+
+      // Ngrok reconnect watchdog messages
+      if (line.startsWith("[Ngrok]")) {
+        const isNgrokError = line.includes("failed") || line.includes("error");
+        this.emitLog(line, isNgrokError ? "warn" : "info", "general", line);
         continue;
       }
 

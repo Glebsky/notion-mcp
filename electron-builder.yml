@@ -18,6 +18,12 @@ win:
       arch:
         - x64
   icon: desktop/icon.svg
+  signExecutable: false
+  signExts:
+    - "!.exe"
+portable:
+  artifactName: "Notion Terminal MCP Portable.exe"
+  requestExecutionLevel: user
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
