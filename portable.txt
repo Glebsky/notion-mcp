@@ -1,1 +1,0 @@
-Portable mode enabled. Config and workspace are stored in this folder.

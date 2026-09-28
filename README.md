@@ -246,7 +246,6 @@ notion-terminal-mcp/
 ├── build.ps1                  # Automated PowerShell build script (portable/installer/all/dir/clean)
 ├── electron-builder.yml       # Windows packaging configuration (Portable + NSIS)
 ├── package.json
-├── portable.txt               # Portable mode notes (stores .env & workspace next to .exe)
 ├── setup.ps1                  # PowerShell initial environment setup script
 ├── start-public.ps1           # Zero-config Cloudflare Quick Tunnel launcher
 └── tsconfig*.json
