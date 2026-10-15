@@ -9,6 +9,9 @@ files:
   - desktop/icon.svg
   - desktop/icon.png
   - package.json
+asar: true
+asarUnpack:
+  - "**/@ngrok/**"
 win:
   target:
     - target: portable
@@ -24,6 +27,7 @@ win:
 portable:
   artifactName: "Notion Terminal MCP Portable.exe"
   requestExecutionLevel: user
+  unpackDirName: false
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

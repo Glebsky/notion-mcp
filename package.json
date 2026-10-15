@@ -31,6 +31,9 @@
     "puppeteer-core": "^25.10.0",
     "zod": "^4.6.2"
   },
+  "optionalDependencies": {
+    "@ngrok/ngrok-win32-x64-msvc": "^1.7.0"
+  },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@types/express": "^5.0.3",

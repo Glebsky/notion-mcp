@@ -1,9 +1,24 @@
-import ngrok from "@ngrok/ngrok";
+import type NgrokNamespace from "@ngrok/ngrok";
 import { config } from "../config.js";
 
-let listener: Awaited<ReturnType<typeof ngrok.forward>> | null = null;
+type NgrokType = typeof NgrokNamespace;
+let ngrokModule: NgrokType | null = null;
+let listener: Awaited<ReturnType<NgrokType["forward"]>> | null = null;
 let isShuttingDown = false;
 let reconnectAttempt = 0;
+
+async function getNgrok(): Promise<NgrokType> {
+  if (!ngrokModule) {
+    try {
+      const imported = await import("@ngrok/ngrok");
+      ngrokModule = ((imported as unknown as { default?: NgrokType }).default ?? imported) as unknown as NgrokType;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to load @ngrok/ngrok native module. Ensure that @ngrok/ngrok-win32-x64-msvc is available. Details: ${msg}`);
+    }
+  }
+  return ngrokModule;
+}
 
 const RECONNECT_BASE_MS = 2_000;
 const RECONNECT_MAX_MS = 60_000;
@@ -22,6 +37,8 @@ async function connectNgrok(): Promise<string | null> {
     }
     listener = null;
   }
+
+  const ngrok = await getNgrok();
 
   const forwardOptions: Parameters<typeof ngrok.forward>[0] = {
     addr: config.port,
@@ -126,11 +143,13 @@ export async function stopNgrokTunnel(): Promise<void> {
     listener = null;
   }
 
-  try {
-    await ngrok.disconnect();
-    await ngrok.kill();
-  } catch {
-    // Ignore disconnect errors on exit
+  if (ngrokModule) {
+    try {
+      await ngrokModule.disconnect();
+      await ngrokModule.kill();
+    } catch {
+      // Ignore disconnect errors on exit
+    }
   }
 }
 
