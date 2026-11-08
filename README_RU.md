@@ -1,4 +1,4 @@
-# Notion Terminal MCP
+# MCP Terminal
 
 [![MCP](https://img.shields.io/badge/MCP-Streamable_HTTP-7c3aed)](https://modelcontextprotocol.io/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -83,7 +83,7 @@ ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok
 
 #### Вариант А: Быстрые батники Windows (.bat)
 - Запустите двойным кликом **`build.bat`** для интерактивного меню сборщика (Portable .exe, Setup инсталлятор, оба сразу, распаковка или очистка).
-- Запустите **`build-portable.bat`** для мгновенной сборки портативного `release\Notion Terminal MCP Portable.exe` в один клик.
+- Запустите **`build-portable.bat`** для мгновенной сборки портативного `release\MCP Terminal Portable.exe` в один клик.
 
 #### Вариант Б: Консоль (Node.js & npm)
 ```bash
@@ -193,8 +193,8 @@ Authentication Header:
 Для быстрой работы без ввода команд вручную в корень добавлены:
 
 - **`build.bat`** — Интерактивное меню сборки:
-  - `[1]` Собрать Portable версию (`release\Notion Terminal MCP Portable.exe`)
-  - `[2]` Собрать Установщик Setup (`release\Notion Terminal MCP Setup 1.0.0.exe`)
+  - `[1]` Собрать Portable версию (`release\MCP Terminal Portable.exe`)
+  - `[2]` Собрать Установщик Setup (`release\MCP Terminal Setup 2.0.0.exe`)
   - `[3]` Собрать Всё (Portable + Setup)
   - `[4]` Распаковать в `release\win-unpacked`
   - `[5]` Очистить папку `release/`
@@ -208,8 +208,8 @@ Authentication Header:
 
 - `npm run app:start` — Сборка и запуск графического приложения Desktop GUI (Electron + Liquid Glass UI).
 - `npm run app:dev` — Запуск Desktop приложения в режиме разработки с горячей перезагрузкой (Vite + Electron).
-- `npm run package:portable` — Сборка автономной **Portable `.exe`** версии. Выход: `release/Notion Terminal MCP Portable.exe`.
-- `npm run package:installer` — Сборка инсталлятора Windows **Setup `.exe`** (NSIS мастер). Выход: `release/Notion Terminal MCP Setup 1.0.0.exe`.
+- `npm run package:portable` — Сборка автономной **Portable `.exe`** версии. Выход: `release/MCP Terminal Portable.exe`.
+- `npm run package:installer` — Сборка инсталлятора Windows **Setup `.exe`** (NSIS мастер). Выход: `release/MCP Terminal Setup 2.0.0.exe`.
 - `npm run package:exe` — Одновременная сборка **обоих** вариантов (Portable + Installer).
 - `npm run build` — Компиляция TypeScript сервера, Electron процессов и Vite React интерфейса.
 - `npm run start` — Запуск консольного MCP-сервера из `dist/index.js`.
@@ -223,9 +223,24 @@ Authentication Header:
 
 | Команда | Способ | Результат в `release/` |
 |---|---|---|
-| `build-portable.bat` / `npm run package:portable` | Батник / npm | `Notion Terminal MCP Portable.exe` |
-| `npm run package:installer` | Батник / npm | `Notion Terminal MCP Setup 1.0.0.exe` |
+| `build-portable.bat` / `npm run package:portable` | Батник / npm | `MCP Terminal Portable.exe` |
+| `npm run package:installer` | Батник / npm | `MCP Terminal Setup 2.0.0.exe` |
 | `build.bat all` / `npm run package:exe` | Батник / npm | Оба файла выше |
 
 > [!TIP]
-> **Настоящий Portable режим**: При запуске `Notion Terminal MCP Portable.exe` конфигурация (`.env`) и папка проектов `workspace/` создаются **прямо рядом с файлом .exe**. Вы можете носить папку на флешке со всеми настройками. Для версии из инсталлятора настройки хранятся в `%APPDATA%\notion-terminal-mcp\config\.env`.
+> **Настоящий Portable режим**: При запуске `MCP Terminal Portable.exe` конфигурация (`.env`) и папка проектов `workspace/` создаются в папке `MCP Terminal Data` рядом с `.exe`. При переносе проверьте абсолютный путь к рабочей папке в настройках. Для версии из инсталлятора настройки хранятся в `%APPDATA%\mcp-terminal\config\.env`.
+
+
+### Мониторинг MCP Terminal
+
+На вкладке **Monitor** отображаются последние клиенты, открытые SSE-потоки, активные HTTP-запросы, число запросов и скорость входящих и исходящих данных. Указывается размер тел авторизованных MCP-сообщений без HTTP-заголовков; измерение не является сетевым счётчиком TCP/TLS. Цвета соответствуют операциям, а подпись над трубой показывает, сколько байт примерно представляет одна частица в текущем интервале. Для SSE ответы учитываются как трафик потока SSE.
+
+Имена клиентов и адреса получаются из сведений клиента и адреса непосредственного сокета: это не проверенные личности, а при работе через туннель адрес может относиться к туннелю. Список ограничен 50 последними записями и хранится только в памяти. HTTP работает без постоянной сессии, поэтому активные запросы не равнозначны числу постоянно подключённых пользователей. При повторном включении мониторинга активные HTTP-запросы видны только для запросов, начавшихся после включения; открытые SSE-потоки отображаются отдельно.
+
+**Pause monitoring** останавливает сбор метрик и очищает счётчики; журнал продолжает работать. Настройка **Interface animations** в настройках отключает движение фона и частиц и сохраняется на устройстве. Существующие серверные настройки остаются в .env.
+
+Проверка мониторинга: `npm run test:monitor`.
+
+### Отдельная версия 2.0
+
+MCP Terminal 2.0 использует отдельные профиль и блокировку экземпляра, поэтому его можно открыть одновременно со старой программой. Новая portable-версия создаёт `MCP Terminal Data/.env` рядом с EXE; установленная — `%APPDATA%\mcp-terminal\config\.env`. Старая конфигурация не изменяется и автоматически не переносится. При первом запуске создаются новый токен и отдельная рабочая папка; стандартный порт нового профиля — 3100. Для двух одновременно работающих серверов нужны разные свободные порты и отдельные публичные туннели. При необходимости перенесите настройки вручную. Переменная `MCP_TERMINAL_ENV_PATH` позволяет явно выбрать иной файл конфигурации.

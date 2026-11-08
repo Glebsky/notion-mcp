@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve Notion Terminal MCP.
+Thanks for helping improve MCP Terminal.
 
 ## Development Workflow
 

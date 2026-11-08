@@ -8,9 +8,11 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
+  animation: boolean;
+  onAnimationChange: (enabled: boolean) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSaved }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSaved, animation, onAnimationChange }) => {
   const [config, setConfig] = useState<EnvConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,12 +93,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           </div>
         ) : (
           <form onSubmit={handleSave} className="overflow-y-auto py-4 space-y-4 pr-1">
+            <div className="appearance-setting">
+              <div><span>Interface animations</span><p>Animated gradient and traffic particles. Saved on this device.</p></div>
+              <label className="appearance-switch"><input type="checkbox" checked={animation} onChange={(e) => onAnimationChange(e.target.checked)} aria-label="Interface animations"/><span/></label>
+            </div>
             {/* API Key */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5 text-violet-400" />
-                  Notion Secret API Key (MCP_API_KEY)
+                  MCP Secret API Key (MCP_API_KEY)
                 </label>
                 <button
                   type="button"

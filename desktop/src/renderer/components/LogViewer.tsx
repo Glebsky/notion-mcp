@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Terminal, Trash2, Filter, ArrowDown, Search } from "lucide-react";
+import { operationColor, logOperation } from "./operationColor";
 import type { LogEntry } from "../../types";
 
 
@@ -13,7 +14,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
   const [filter, setFilter] = useState<"all" | "audit" | "command" | "file" | "error">("all");
   const [search, setSearch] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const filteredLogs = logs.filter((log) => {
     if (filter === "audit" && log.type !== "audit") return false;
@@ -29,7 +30,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
 
   useEffect(() => {
     if (autoScroll) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
 
@@ -88,21 +89,24 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
       </div>
 
       {/* Terminal Log Output */}
-      <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-1.5 bg-slate-950/70 select-text">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-1.5 bg-slate-950/70 select-text">
         {filteredLogs.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs py-12 gap-2">
             <Terminal className="w-8 h-8 text-slate-700 stroke-1" />
-            <span>No log events yet. Start the server or trigger Notion actions.</span>
+            <span>No log events yet. Start the server or connect an MCP client.</span>
           </div>
         ) : (
           filteredLogs.map((log) => {
             const isAudit = log.type === "audit";
             const isError = log.type === "error";
             const isMcp = log.type === "mcp";
+            const operation = logOperation(log.message, log.type);
+            const color = operationColor(operation);
 
             return (
               <div
                 key={log.id}
+                style={{ borderLeft: `3px solid ${color}` }}
                 className={`group flex items-start gap-3 py-1 px-2 rounded-lg transition-colors ${
                   isAudit
                     ? "bg-violet-950/20 border border-violet-500/10 text-violet-200"
@@ -133,12 +137,12 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
                   </span>
                 )}
 
+                <span className="operation-label" style={{ color }}>{operation}</span>
                 <span className="break-all whitespace-pre-wrap leading-relaxed">{log.message}</span>
               </div>
             );
           })
         )}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

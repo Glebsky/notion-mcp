@@ -6,9 +6,11 @@ import { config } from "./config.js";
 import { authenticate } from "./middleware/auth.js";
 import { validateHost } from "./middleware/host.js";
 import { registerAllTools } from "./tools/index.js";
+import { monitorRequest, recordRequestBody, setSseCountProvider } from "./monitor.js";
 
 // Active SSE sessions for standard MCP SSE transport (/sse + /messages)
 const sseSessions = new Map<string, { transport: SSEServerTransport; server: McpServer }>();
+setSseCountProvider(() => sseSessions.size);
 
 // Active Streamable HTTP transports for graceful shutdown
 const activeStreamableTransports = new Set<StreamableHTTPServerTransport>();
@@ -27,7 +29,7 @@ export function createApp(): Express {
   const app = express();
 
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "2mb" }));
+  app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => recordRequestBody(req as import("express").Request, buf) }));
 
   // Keep-alive settings to prevent hanging connections
   app.use((_req, res, next) => {
@@ -39,7 +41,7 @@ export function createApp(): Express {
   // Root endpoint info
   app.get("/", (_req, res) => {
     res.json({
-      name: "Notion Terminal MCP Server",
+      name: "MCP Terminal Server",
       status: "running",
       protocol: "Model Context Protocol (Streamable HTTP + SSE)",
       endpoints: {
@@ -69,7 +71,7 @@ export function createApp(): Express {
   // 1. Streamable HTTP MCP endpoint (/mcp)
   // Uses stateless mode (sessionIdGenerator: undefined) so clients can connect
   // directly without strict session validation errors (HTTP 400).
-  app.all("/mcp", validateHost, authenticate, async (req, res) => {
+  app.all("/mcp", validateHost, authenticate, monitorRequest, async (req, res) => {
     const server = createMcpServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -99,7 +101,7 @@ export function createApp(): Express {
   // 2. Standard MCP SSE transport endpoint (/sse)
   // For clients (like older Notion integrations or Cursor) that use the standard
   // SSE handshake: GET /sse -> sends endpoint event -> client POSTs to /messages?sessionId=...
-  app.get("/sse", validateHost, authenticate, async (req, res) => {
+  app.get("/sse", validateHost, authenticate, monitorRequest, async (req, res) => {
     const server = createMcpServer();
     const transport = new SSEServerTransport("/messages", res);
     const sessionId = transport.sessionId;
@@ -123,7 +125,7 @@ export function createApp(): Express {
   });
 
   // Message receiver for standard SSE transport
-  app.post("/messages", validateHost, authenticate, async (req, res) => {
+  app.post("/messages", validateHost, authenticate, monitorRequest, async (req, res) => {
     const sessionId = (req.query.sessionId as string | undefined)?.trim();
     if (!sessionId || !sseSessions.has(sessionId)) {
       res.status(404).json({ error: "SSE session not found or expired" });

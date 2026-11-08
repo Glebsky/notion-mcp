@@ -1,11 +1,12 @@
 import { config } from "./config.js";
 import { createApp, getActiveSessions } from "./server.js";
+import { setMonitoringEnabled } from "./monitor.js";
 import { startNgrokTunnel, stopNgrokTunnel } from "./tunnel/ngrok.js";
 
 const app = createApp();
 
 const httpServer = app.listen(config.port, config.host, async () => {
-  console.log(`Notion Terminal MCP listening on http://${config.host}:${config.port}/mcp`);
+  console.log(`MCP Terminal listening on http://${config.host}:${config.port}/mcp`);
   console.log(
     `Filesystem mode: ${config.fullAccess ? "FULL HOST ACCESS (UNRESTRICTED)" : `restricted to ${config.filesRoot}`}`,
   );
@@ -53,6 +54,9 @@ process.on("SIGTERM", () => {
 });
 
 process.on("message", (msg: unknown) => {
+  if (typeof msg === "object" && msg !== null && (msg as { type?: string }).type === "monitor:set") {
+    setMonitoringEnabled((msg as { enabled?: boolean }).enabled === true);
+  }
   if (typeof msg === "object" && msg !== null && (msg as { type?: string }).type === "shutdown") {
     void gracefulShutdown("IPC");
   }

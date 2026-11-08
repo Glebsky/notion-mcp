@@ -1,9 +1,9 @@
 {
-  "name": "notion-terminal-mcp",
-  "version": "1.0.0",
+  "name": "mcp-terminal",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Authenticated remote MCP server exposing terminal and filesystem tools to Notion Custom Agents.",
+  "description": "Authenticated remote MCP server exposing terminal and filesystem tools to AI agents.",
   "main": "dist-desktop/main/index.js",
   "scripts": {
     "build:server": "tsc -p tsconfig.json",
@@ -18,7 +18,10 @@
     "package:portable": "npm run build && electron-builder --win portable",
     "package:installer": "npm run build && electron-builder --win nsis",
     "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.desktop.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
-    "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\""
+    "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
+    "test:monitor": "npm run build:server && node tests/monitor.cjs",
+    "test:packaged": "node tests/packaged-smoke.cjs",
+    "test:portable": "node tests/packaged-smoke.cjs --portable"
   },
   "engines": {
     "node": ">=20"

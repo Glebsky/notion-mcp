@@ -1,4 +1,4 @@
-# Agent Specification: Notion Terminal MCP
+# Agent Specification: MCP Terminal
 
 Technical specification and operational guide for AI Agents (Notion Custom Agents, Claude, Cursor, Antigravity, and autonomous LLM agents) interacting with this MCP server.
 
@@ -24,7 +24,7 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
 └───────────────────┬────────────────────┘
                     │
 ┌───────────────────▼────────────────────┐
-│      Notion Terminal MCP Server        │
+│      MCP Terminal Server        │
 │  - Timing-Safe Authentication          │
 │  - Host Header Validation              │
 │  - Sandboxed / Full Access FS          │

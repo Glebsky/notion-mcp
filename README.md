@@ -1,4 +1,4 @@
-# Notion Terminal MCP
+# MCP Terminal
 
 [![MCP](https://img.shields.io/badge/MCP-Streamable_HTTP-7c3aed)](https://modelcontextprotocol.io/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -84,7 +84,7 @@ ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok
 
 #### Option A: Quick Windows Batch Scripts
 - Double-click **`build.bat`** to open an interactive Windows build menu (Portable .exe, Setup installer, both, unpacked dir, or clean).
-- Double-click **`build-portable.bat`** to compile and generate `release\Notion Terminal MCP Portable.exe` in one click.
+- Double-click **`build-portable.bat`** to compile and generate `release\MCP Terminal Portable.exe` in one click.
 
 #### Option B: Terminal (Node.js & npm)
 ```bash
@@ -258,8 +258,8 @@ notion-terminal-mcp/
 For fast execution without remembering npm commands:
 
 - **`build.bat`** — Interactive command prompt menu:
-  - `[1]` Build Portable version (`release\Notion Terminal MCP Portable.exe`)
-  - `[2]` Build Setup wizard installer (`release\Notion Terminal MCP Setup 1.0.0.exe`)
+  - `[1]` Build Portable version (`release\MCP Terminal Portable.exe`)
+  - `[2]` Build Setup wizard installer (`release\MCP Terminal Setup 2.0.0.exe`)
   - `[3]` Build Both (Portable + Setup)
   - `[4]` Unpack to `release\win-unpacked`
   - `[5]` Clean `release/` directory
@@ -273,8 +273,8 @@ For fast execution without remembering npm commands:
 
 - `npm run app:start` — Build and launch the **Desktop GUI App** (Electron + Liquid Glass UI) for local testing without packaging.
 - `npm run app:dev` — Launch the Desktop App in live development mode with hot-reload (Vite + Electron).
-- `npm run package:portable` — Build standalone **Portable `.exe`**. Output: `release/Notion Terminal MCP Portable.exe`.
-- `npm run package:installer` — Build Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/Notion Terminal MCP Setup 1.0.0.exe`.
+- `npm run package:portable` — Build standalone **Portable `.exe`**. Output: `release/MCP Terminal Portable.exe`.
+- `npm run package:installer` — Build Windows **Setup/Installer `.exe`** (NSIS wizard). Output: `release/MCP Terminal Setup 2.0.0.exe`.
 - `npm run package:exe` — Build **both** Portable and Installer executable packages at once.
 - `npm run build` — Compile TypeScript server, Electron main/preload, and Vite React renderer.
 - `npm run start` — Run headless MCP server from `dist/index.js` (CLI mode).
@@ -290,12 +290,12 @@ When you need standalone Windows binaries (`.exe`), run `build.bat`, `build-port
 
 | Command | Method | Target | Output in `release/` |
 |---|---|---|---|
-| `build-portable.bat` / `npm run package:portable` | Batch / npm | Portable single executable | `Notion Terminal MCP Portable.exe` |
-| `npm run package:installer` | Batch / npm | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `Notion Terminal MCP Setup 1.0.0.exe` |
+| `build-portable.bat` / `npm run package:portable` | Batch / npm | Portable single executable | `MCP Terminal Portable.exe` |
+| `npm run package:installer` | Batch / npm | NSIS Setup Wizard (Start Menu & Desktop shortcuts) | `MCP Terminal Setup 2.0.0.exe` |
 | `build.bat all` / `npm run package:exe` | Batch / npm | Both targets (Portable + Installer) | Both files above |
 
 > [!TIP]
-> **True Portable Mode**: When running `Notion Terminal MCP Portable.exe`, configuration (`.env`) and the `workspace/` folder are saved directly next to the executable, allowing full portability across flash drives and workstations. When installed via Setup wizard, configuration resides in `%APPDATA%\notion-terminal-mcp\config\.env`.
+> **True Portable Mode**: When running `MCP Terminal Portable.exe`, configuration (`.env`) and the `workspace/` folder are stored in `MCP Terminal Data/` next to the executable. If the portable folder is moved, check the configured absolute workspace path. When installed via Setup wizard, configuration resides in `%APPDATA%\mcp-terminal\config\.env`.
 
 > [!NOTE]
 > `npm run app:start` only compiles TypeScript and runs Electron live in development/test mode. It does **not** create `.exe` files in `release/`. To generate `.exe` binaries, always use `build.bat`, `build-portable.bat`, or `npm run package:*`.

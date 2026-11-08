@@ -10,7 +10,7 @@ $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
 function Show-Header {
     Clear-Host
     Write-Host "=======================================================" -ForegroundColor Cyan
-    Write-Host "        Notion Terminal MCP - Сборка проекта          " -ForegroundColor Cyan
+    Write-Host "        MCP Terminal - Сборка проекта          " -ForegroundColor Cyan
     Write-Host "=======================================================" -ForegroundColor Cyan
     Write-Host ""
 }
@@ -31,7 +31,7 @@ function Do-Portable {
     npx electron-builder --win portable
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n=======================================================" -ForegroundColor Green
-        Write-Host " [УСПЕХ] Файл готов: release\Notion Terminal MCP Portable.exe" -ForegroundColor Green
+        Write-Host " [УСПЕХ] Файл готов: release\MCP Terminal Portable.exe" -ForegroundColor Green
         Write-Host "=======================================================" -ForegroundColor Green
     } else {
         Write-Host "`n[ОШИБКА] Упаковка Portable завершилась с ошибкой!" -ForegroundColor Red

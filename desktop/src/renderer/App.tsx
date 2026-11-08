@@ -1,100 +1,61 @@
 import React, { useEffect, useState } from "react";
+import { Activity, Pause, Play, Terminal } from "lucide-react";
 import { TitleBar } from "./components/TitleBar";
 import { NotionCard } from "./components/NotionCard";
 import { Controls } from "./components/Controls";
 import { LogViewer } from "./components/LogViewer";
 import { SettingsModal } from "./components/SettingsModal";
-import type { LogEntry, ServerStatus } from "../types";
-
+import { Monitor } from "./components/Monitor";
+import type { LogEntry, MonitorSnapshot, ServerStatus } from "../types";
 
 export const App: React.FC = () => {
-  const [status, setStatus] = useState<ServerStatus>({
-    state: "offline",
-    port: 3000,
-    host: "127.0.0.1",
-    ngrokEnabled: false,
-    apiKey: "",
-    fullAccess: false,
-    filesRoot: "./workspace",
-  });
-
+  const [status, setStatus] = useState<ServerStatus>({ state: "offline", port: 3100, host: "127.0.0.1", ngrokEnabled: false, apiKey: "", fullAccess: false, filesRoot: "./workspace" });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [animation, setAnimation] = useState(() => {
+    const saved = localStorage.getItem("mcp-terminal-animation");
+    return saved === null ? !window.matchMedia("(prefers-reduced-motion: reduce)").matches : saved === "true";
+  });
+  const [monitoring, setMonitoring] = useState(() => localStorage.getItem("mcp-terminal-monitoring") !== "false");
+  const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null);
+  const [tab, setTab] = useState<"logs" | "monitor">("monitor");
 
   useEffect(() => {
-    // Initial status fetch
     void window.electronAPI.getServerStatus().then(setStatus);
-
-    // Subscribe to status updates
-    const unsubscribeStatus = window.electronAPI.onStatusChange((newStatus) => {
-      setStatus(newStatus);
-    });
-
-    // Subscribe to log streams
-    const unsubscribeLogs = window.electronAPI.onLog((newLog) => {
-      setLogs((prev) => [...prev.slice(-1000), newLog]);
-    });
-
-    return () => {
-      unsubscribeStatus();
-      unsubscribeLogs();
-    };
+    const unsubStatus = window.electronAPI.onStatusChange(setStatus);
+    const unsubLogs = window.electronAPI.onLog((log) => setLogs((prev) => [...prev.slice(-999), log]));
+    const unsubMonitor = window.electronAPI.onMonitoring(setSnapshot);
+    return () => { unsubStatus(); unsubLogs(); unsubMonitor(); };
   }, []);
+  useEffect(() => { localStorage.setItem("mcp-terminal-animation", String(animation)); }, [animation]);
+  useEffect(() => {
+    localStorage.setItem("mcp-terminal-monitoring", String(monitoring));
+    setSnapshot(null);
+    void window.electronAPI.setMonitoring(monitoring);
+  }, [monitoring]);
+  useEffect(() => { if (status.state !== "running") setSnapshot(null); }, [status.state]);
 
-  const handleStart = async () => {
-    await window.electronAPI.startServer();
-  };
-
-  const handleStop = async () => {
-    await window.electronAPI.stopServer();
-  };
-
-  const handleRestart = async () => {
-    await window.electronAPI.restartServer();
-  };
-
-  const handleClearLogs = async () => {
-    setLogs([]);
-    await window.electronAPI.clearLogs();
-  };
-
+  const toggleMonitor = () => { setMonitoring((value) => !value); if (monitoring) setTab("logs"); else setTab("monitor"); };
   return (
-    <div className="relative w-screen h-screen flex flex-col bg-[#08090d] text-slate-100 overflow-hidden select-none border border-white/10 rounded-xl shadow-2xl">
-      {/* Background Animated Aurora Glows */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Top Title Bar */}
+    <div className={`app-shell ${animation ? "" : "motion-off"}`}>
+      <div className="aurora aurora-one"/><div className="aurora aurora-two"/><div className="aurora aurora-three"/>
       <TitleBar status={status} onOpenSettings={() => setIsSettingsOpen(true)} />
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col p-4 gap-3.5 min-h-0 relative z-10">
-        {/* Controls Bar */}
-        <Controls
-          status={status}
-          onStart={handleStart}
-          onStop={handleStop}
-          onRestart={handleRestart}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
-
-        {/* Notion Connection & Credentials Card */}
-        <NotionCard status={status} />
-
-        {/* Real-time Log Stream & Audit Terminal */}
-        <LogViewer logs={logs} onClear={handleClearLogs} />
+      <main className="dashboard">
+        <Controls status={status} onStart={() => void window.electronAPI.startServer()} onStop={() => void window.electronAPI.stopServer()} onRestart={() => void window.electronAPI.restartServer()} onOpenSettings={() => setIsSettingsOpen(true)} />
+        <NotionCard status={status}/>
+        <div className="workspace-nav">
+          <div className="workspace-tabs" role="tablist" aria-label="Workspace views">
+            <button role="tab" aria-selected={tab === "monitor"} onClick={() => setTab("monitor")}><Activity size={15}/> Monitor</button>
+            <button role="tab" aria-selected={tab === "logs"} onClick={() => setTab("logs")}><Terminal size={15}/> Logs <span>{logs.length}</span></button>
+          </div>
+          <button className="monitor-toggle" onClick={toggleMonitor} aria-pressed={monitoring}>{monitoring ? <Pause size={13}/> : <Play size={13}/>} {monitoring ? "Pause monitoring" : "Enable monitoring"}</button>
+        </div>
+        <div className="workspace-body">
+          {tab === "monitor" ? monitoring ? <Monitor snapshot={snapshot} status={status} animation={animation}/> : <div className="monitor-paused liquid-glass-card"><Pause size={25}/><h2>Monitoring paused</h2><p>Traffic collection is disabled. Logs continue as usual.</p><button className="liquid-glass-btn" onClick={toggleMonitor}>Enable monitoring</button></div> : <LogViewer logs={logs} onClear={() => { setLogs([]); void window.electronAPI.clearLogs(); }}/>}
+        </div>
       </main>
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSaved={() => {
-          void window.electronAPI.getServerStatus().then(setStatus);
-        }}
-      />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onSaved={() => void window.electronAPI.getServerStatus().then(setStatus)} animation={animation} onAnimationChange={setAnimation}/>
     </div>
   );
 };
-
 export default App;

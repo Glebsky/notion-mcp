@@ -1,4 +1,4 @@
-# User Guide: Notion Terminal MCP
+# User Guide: MCP Terminal
 
 Complete illustrated guide to installation, configuration, architecture, and usage of the MCP server and Desktop GUI application.
 
@@ -27,7 +27,7 @@ Complete illustrated guide to installation, configuration, architecture, and usa
 
 ## 1. Introduction and Capabilities
 
-**Notion Terminal MCP** is a bridge between artificial intelligence agents (Notion Custom Agents, Claude, Cursor, Antigravity) and your local operating system. The server conforms to the official **Model Context Protocol (MCP)** specification via **Streamable HTTP** and **Server-Sent Events (SSE)** transports.
+**MCP Terminal** is a bridge between artificial intelligence agents (Notion Custom Agents, Claude, Cursor, Antigravity) and your local operating system. The server conforms to the official **Model Context Protocol (MCP)** specification via **Streamable HTTP** and **Server-Sent Events (SSE)** transports.
 
 ### Key Capabilities:
 - 🖥️ **Desktop GUI (Liquid Glass Dark)**: Sleek Electron + React desktop interface featuring real-time server controls, live audit logs, and one-click copy buttons for Notion endpoints.
@@ -46,8 +46,8 @@ Complete illustrated guide to installation, configuration, architecture, and usa
 ### Option A: Desktop Application (.exe) *(Recommended)*
 
 Windows binaries are available in the `release/` folder:
-- **`release/Notion Terminal MCP Portable.exe`** — Standalone portable version. Requires no installation and launches immediately. All configuration (`.env`) and the `workspace/` folder are saved directly next to the executable, allowing complete portability on USB drives.
-- **`release/Notion Terminal MCP Setup 1.0.0.exe`** — Standard Windows setup installer (creates Desktop and Start Menu shortcuts).
+- **`release/MCP Terminal Portable.exe`** — Standalone portable version. Requires no installation and launches immediately. Configuration (`.env`) and the `workspace/` folder are stored in `MCP Terminal Data/` beside the executable. If you move the folder, check the configured absolute workspace path.
+- **`release/MCP Terminal Setup 2.0.0.exe`** — Standard Windows setup installer (creates Desktop and Start Menu shortcuts).
 
 **How to run:**
 1. Launch the `.exe` file.
@@ -65,7 +65,7 @@ To build and compile binaries easily without typing long terminal commands:
 - **`build.bat`** — Launches an interactive Windows build menu:
   ```text
   =======================================================
-          Notion Terminal MCP - Build Wizard            
+          MCP Terminal - Build Wizard
   =======================================================
 
    [1] Build Portable version (Portable.exe)
@@ -86,7 +86,7 @@ To build and compile binaries easily without typing long terminal commands:
   build.bat clean       rem Clean release directory
   ```
 
-- **`build-portable.bat`** — One-click shortcut to build the Portable executable. Simply double-click the file, and `Notion Terminal MCP Portable.exe` will be generated in `release/`.
+- **`build-portable.bat`** — One-click shortcut to build the Portable executable. Simply double-click the file, and `MCP Terminal Portable.exe` will be generated in `release/`.
 
 ---
 
@@ -142,7 +142,7 @@ The desktop interface is designed for real-time visibility and convenience:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ [>_] Notion Terminal MCP   v1.0.0    [● RUNNING | Port 3000] [Ngrok]   │
+│ [>_] MCP Terminal   v2.0.0    [● RUNNING | Port 3000] [Ngrok]   │
 ├────────────────────────────────────────────────────────────────────────┤
 │ [ ▶ Start / ■ Stop ]  [ ⟳ Restart ]       📁 C:\...\workspace  [⚙ Settings]│
 ├────────────────────────────────────────────────────────────────────────┤
@@ -159,7 +159,7 @@ The desktop interface is designed for real-time visibility and convenience:
 │  🌐 Ngrok Base Domain: https://statue-egomaniac-storable.ngrok-free.dev │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Real-time Activity Logs & Audit Stream                                 │
-│ [11:24:00] [MCP] Notion Terminal MCP listening on http://127.0.0.1:3000│
+│ [11:24:00] [MCP] MCP Terminal listening on http://127.0.0.1:3000│
 │ [11:24:02] [AUDIT] FILE_READ: workspace/src/index.ts (200 OK)         │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -218,7 +218,7 @@ Click **Settings (.env)** to configure server options visually:
  Public Tunnel (Ngrok or Cloudflare)
          │
          ▼
- Notion Terminal MCP (Local Node.js/Electron Engine)
+ MCP Terminal (Local Node.js/Electron Engine)
   ├── 1. Host Header Check (DNS Rebinding guard)
   ├── 2. Timing-Safe Auth Check (side-channel attack prevention)
   ├── 3. Structured Audit Logger (real-time UI log stream)
@@ -303,9 +303,9 @@ Detailed JSON schemas and specifications are available in [`AGENTS.md`](AGENTS.m
 
 #### Q: Where is configuration stored when using `.exe`?
 **A**:
-- **Portable Version (`Notion Terminal MCP Portable.exe`)**: True portable mode. The `.env` file and `workspace/` folder are stored **directly next to the `.exe` file**. You can carry the entire folder on a USB flash drive between computers with all tokens and files intact.
-- **Installer Version (Setup.exe)**: Configuration is stored in `%APPDATA%\notion-terminal-mcp\config\.env`.
+- **Portable Version (`MCP Terminal Portable.exe`)**: True portable mode. The `.env` file and `workspace/` folder are stored in `MCP Terminal Data/` beside the `.exe`. Check the configured absolute workspace path after moving the folder.
+- **Installer Version (Setup.exe)**: Configuration is stored in `%APPDATA%\mcp-terminal\config\.env`.
 - **Development / CLI**: Stored in `.env` in the repository root.
 
 #### Q: How can I quickly recompile executables on Windows?
-**A**: Run **`build.bat`** for the interactive menu or **`build-portable.bat`** to generate `release\Notion Terminal MCP Portable.exe` in one click.
+**A**: Run **`build.bat`** for the interactive menu or **`build-portable.bat`** to generate `release\MCP Terminal Portable.exe` in one click.

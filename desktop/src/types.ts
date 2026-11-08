@@ -20,6 +20,13 @@ export interface LogEntry {
   raw?: string;
 }
 
+export interface MonitorSnapshot {
+  received: number; sent: number; totalReceived: number; totalSent: number;
+  totalRequests: number; activeRequests: number; activeSse: number; activeHttp: number; sampledAt: number;
+  recentClients: { client: string; operation: string; lastSeen: string; requests: number }[];
+  operations: { operation: string; received: number; sent: number }[];
+}
+
 export interface EnvConfig {
   PORT: string;
   HOST: string;
@@ -52,6 +59,9 @@ export interface ElectronAPI {
   onLog: (callback: (log: LogEntry) => void) => () => void;
   onStatusChange: (callback: (status: ServerStatus) => void) => () => void;
   clearLogs: () => Promise<void>;
+
+  setMonitoring: (enabled: boolean) => Promise<void>;
+  onMonitoring: (callback: (snapshot: MonitorSnapshot) => void) => () => void;
 
   // Window Controls & Tray
   minimizeWindow: () => void;

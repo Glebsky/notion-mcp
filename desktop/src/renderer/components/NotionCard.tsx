@@ -37,7 +37,7 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
             <Sparkles className="w-4 h-4 text-cyan-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white tracking-wide">Notion & MCP Endpoints</h3>
+            <h3 className="text-sm font-bold text-white tracking-wide">MCP Endpoints</h3>
             <p className="text-xs text-slate-400">Endpoints and authentication tokens for AI agents</p>
           </div>
         </div>
@@ -62,7 +62,7 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <Link2 className="w-3 h-3 text-cyan-400" />
-              Notion Public URL (Ngrok /mcp)
+              Public MCP URL (Ngrok /mcp)
             </span>
             <button
               onClick={() => copyToClipboard(ngrokMcpUrl || localMcpUrl, "publicMcpUrl")}
@@ -115,7 +115,7 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
             </button>
           </div>
           <div className="font-mono text-xs text-slate-200 truncate bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-white/5 select-all">
-            {isLive ? localMcpUrl : "http://127.0.0.1:3000/mcp"}
+            {isLive ? localMcpUrl : localMcpUrl}
           </div>
         </div>
 

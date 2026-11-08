@@ -1,5 +1,6 @@
 import React from "react";
-import { Minus, Square, X, Terminal, Shield, Globe, ArrowDownToLine } from "lucide-react";
+import { Minus, Square, X, Shield, Globe, ArrowDownToLine } from "lucide-react";
+import stationIcon from "../../../icon.svg";
 import type { ServerStatus } from "../../types";
 
 
@@ -17,15 +18,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({ status, onOpenSettings }) =>
       {/* App Branding */}
       <div className="flex items-center gap-3 no-drag">
         <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-tr from-violet-600 to-cyan-500 shadow-lg shadow-violet-500/20 border border-white/20">
-          <Terminal className="w-4 h-4 text-white" />
+          <img src={stationIcon} alt="" className="w-full h-full rounded-lg" />
           {isRunning && (
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950 animate-pulse" />
           )}
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="font-bold text-sm tracking-tight text-white/90">Notion Terminal MCP</span>
+          <span className="font-bold text-sm tracking-tight text-white/90">MCP Terminal</span>
           <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5">
-            v1.0.0
+            v2.0.0
           </span>
         </div>
       </div>

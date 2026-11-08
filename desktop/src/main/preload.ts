@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { ElectronAPI, EnvConfig, LogEntry, ServerStatus } from "../types.js";
+import type { ElectronAPI, EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
 
 const api: ElectronAPI = {
   startServer: () => ipcRenderer.invoke("server:start"),
@@ -29,6 +29,12 @@ const api: ElectronAPI = {
   },
 
   clearLogs: () => ipcRenderer.invoke("logs:clear"),
+  setMonitoring: (enabled: boolean) => ipcRenderer.invoke("monitor:set", enabled),
+  onMonitoring: (callback: (snapshot: MonitorSnapshot) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, snapshot: MonitorSnapshot) => callback(snapshot);
+    ipcRenderer.on("monitor:snapshot", handler);
+    return () => ipcRenderer.removeListener("monitor:snapshot", handler);
+  },
 
   minimizeWindow: () => ipcRenderer.send("window:minimize"),
   maximizeWindow: () => ipcRenderer.send("window:maximize"),

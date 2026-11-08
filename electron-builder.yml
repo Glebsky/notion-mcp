@@ -1,5 +1,5 @@
-appId: com.notionmcp.terminal
-productName: Notion Terminal MCP
+appId: com.mcpterminal.desktop
+productName: MCP Terminal
 directories:
   output: release
 files:
@@ -9,6 +9,7 @@ files:
   - desktop/icon.svg
   - desktop/icon.png
   - package.json
+compression: normal
 asar: true
 asarUnpack:
   - "**/@ngrok/**"
@@ -25,7 +26,7 @@ win:
   signExts:
     - "!.exe"
 portable:
-  artifactName: "Notion Terminal MCP Portable.exe"
+  artifactName: "MCP Terminal Portable.exe"
   requestExecutionLevel: user
   unpackDirName: false
 nsis:
@@ -33,4 +34,4 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Notion Terminal MCP
+  shortcutName: MCP Terminal

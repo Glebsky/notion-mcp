@@ -2,13 +2,13 @@ import { spawn, type ChildProcess } from "node:child_process";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
-import type { EnvConfig, LogEntry, ServerStatus } from "../types.js";
+import type { EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
 
 export class ServerManager {
   private process: ChildProcess | null = null;
   private status: ServerStatus = {
     state: "offline",
-    port: 3000,
+    port: 3100,
     host: "127.0.0.1",
     ngrokEnabled: false,
     apiKey: "",
@@ -16,6 +16,13 @@ export class ServerManager {
     filesRoot: "./workspace",
   };
 
+  private monitoringEnabled = true;
+  private monitorCallback: ((snapshot: MonitorSnapshot) => void) | null = null;
+  public setMonitorCallback(callback: (snapshot: MonitorSnapshot) => void) { this.monitorCallback = callback; }
+  public setMonitoring(enabled: boolean) {
+    this.monitoringEnabled = enabled;
+    if (this.process?.connected) this.process.send({ type: "monitor:set", enabled });
+  }
   private projectRoot: string;
   private configDir: string;
   private onLogCallback: ((log: LogEntry) => void) | null = null;
@@ -72,8 +79,8 @@ export class ServerManager {
 
   public getEnvPath(): string {
     // Allow overriding via env var — useful for pointing packaged app to project .env
-    if (process.env.NOTION_MCP_ENV_PATH) {
-      return process.env.NOTION_MCP_ENV_PATH;
+    if (process.env.MCP_TERMINAL_ENV_PATH) {
+      return process.env.MCP_TERMINAL_ENV_PATH;
     }
     return path.join(this.configDir, ".env");
   }
@@ -91,9 +98,9 @@ export class ServerManager {
 
       const defaultContent = [
         `MCP_API_KEY=${defaultApiKey}`,
-        `PORT=3000`,
+        `PORT=3100`,
         `HOST=127.0.0.1`,
-        `ALLOWED_HOSTS=localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com`,
+        `ALLOWED_HOSTS=localhost:3100;127.0.0.1:3100;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com`,
         `NGROK_ENABLED=false`,
         `NGROK_AUTHTOKEN=`,
         `NGROK_DOMAIN=`,
@@ -104,7 +111,13 @@ export class ServerManager {
         `MAX_FILE_BYTES=10485760`,
       ].join("\n") + "\n";
 
-      await fs.writeFile(envPath, defaultContent, "utf8");
+      // Concurrent startup/config requests must not overwrite a newly created key.
+      await fs.mkdir(path.dirname(envPath), { recursive: true });
+      try {
+        await fs.writeFile(envPath, defaultContent, { encoding: "utf8", flag: "wx" });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
     }
   }
 
@@ -112,7 +125,7 @@ export class ServerManager {
     await this.ensureEnvExists();
     const envPath = this.getEnvPath();
     const defaultConfig: EnvConfig = {
-      PORT: "3000",
+      PORT: "3100",
       HOST: "127.0.0.1",
       MCP_API_KEY: "",
       FULL_ACCESS: "false",
@@ -120,7 +133,7 @@ export class ServerManager {
       NGROK_ENABLED: "false",
       NGROK_AUTHTOKEN: "",
       NGROK_DOMAIN: "",
-      ALLOWED_HOSTS: "localhost:3000;127.0.0.1:3000;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com",
+      ALLOWED_HOSTS: "localhost:3100;127.0.0.1:3100;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com",
       COMMAND_TIMEOUT_MS: "120000",
       MAX_OUTPUT_BYTES: "1048576",
       MAX_FILE_BYTES: "10485760",
@@ -180,7 +193,7 @@ export class ServerManager {
   public async reloadConfig() {
     const config = await this.getEnvConfig();
     this.updateStatus({
-      port: Number.parseInt(config.PORT, 10) || 3000,
+      port: Number.parseInt(config.PORT, 10) || 3100,
       host: config.HOST || "127.0.0.1",
       apiKey: config.MCP_API_KEY || "",
       fullAccess: config.FULL_ACCESS === "true",
@@ -197,7 +210,7 @@ export class ServerManager {
 
     await this.reloadConfig();
     this.updateStatus({ state: "starting", error: undefined, ngrokUrl: undefined });
-    this.emitLog("Starting Notion Terminal MCP Server...", "info");
+    this.emitLog("Starting MCP Terminal Server...", "info");
 
     const serverScript = path.join(this.projectRoot, "dist", "index.js");
 
@@ -212,11 +225,15 @@ export class ServerManager {
 
     try {
       const envPath = this.getEnvPath();
+      const config = await this.getEnvConfig();
 
       this.process = spawn(process.execPath, [serverScript], {
         cwd: this.configDir,
         env: {
           ...process.env,
+          // Desktop settings must win over inherited environment from another MCP server.
+          ...config,
+          NGROK_TOKEN: "",
           DOTENV_PATH: envPath,
           ELECTRON_RUN_AS_NODE: "1",
           FORCE_COLOR: "1",
@@ -224,6 +241,13 @@ export class ServerManager {
         stdio: ["pipe", "pipe", "pipe", "ipc"],
         windowsHide: true,
       });
+
+      this.process.on("message", (message: unknown) => {
+        if (this.monitoringEnabled && message && typeof message === "object" && (message as {type?: string}).type === "monitor:snapshot") {
+          this.monitorCallback?.((message as {snapshot: MonitorSnapshot}).snapshot);
+        }
+      });
+      if (this.process.connected) this.process.send({ type: "monitor:set", enabled: this.monitoringEnabled });
 
       this.process.stdout?.on("data", (chunk: Buffer) => {
         const text = chunk.toString("utf8");
@@ -343,7 +367,7 @@ export class ServerManager {
         }
       }
 
-      if (line.includes("Notion Terminal MCP listening on")) {
+      if (line.includes("MCP Terminal listening on")) {
         this.updateStatus({ state: "running" });
         this.emitLog(line, "mcp");
         continue;

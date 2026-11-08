@@ -20,6 +20,8 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let serverManager: ServerManager | null = null;
 let isQuitting = false;
+let shutdownInProgress = false;
+let shutdownComplete = false;
 let hasShownTrayNotification = false;
 
 function showMainWindow() {
@@ -44,7 +46,7 @@ function hideMainWindow() {
     hasShownTrayNotification = true;
     try {
       tray.displayBalloon({
-        title: "Notion Terminal MCP",
+        title: "MCP Terminal",
         content: "Приложение свернуто в трей и продолжает работать. Кликните по значку в трее, чтобы открыть его.",
       });
     } catch {
@@ -136,7 +138,7 @@ function updateTrayMenu(status?: ServerStatus) {
 
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: isWindowVisible ? "Скрыть окно в трей" : "Открыть Notion Terminal",
+      label: isWindowVisible ? "Скрыть окно в трей" : "Открыть MCP Terminal",
       click: () => {
         if (isWindowVisible) {
           hideMainWindow();
@@ -198,8 +200,8 @@ function updateTrayMenu(status?: ServerStatus) {
   tray.setContextMenu(contextMenu);
 
   const tooltipText = isRunning
-    ? `Notion Terminal MCP — Работает (порт ${currentStatus?.port})`
-    : "Notion Terminal MCP — Остановлен";
+    ? `MCP Terminal — Работает (порт ${currentStatus?.port})`
+    : "MCP Terminal — Остановлен";
   tray.setToolTip(tooltipText);
 }
 
@@ -220,6 +222,11 @@ function createTray() {
   updateTrayMenu();
 }
 
+// Use a distinct profile before taking Electron's single-instance lock. This keeps
+// the legacy Notion Terminal MCP running independently, with its data untouched.
+app.setName("mcp-terminal");
+app.setPath("userData", path.join(app.getPath("appData"), "mcp-terminal"));
+if (process.platform === "win32") app.setAppUserModelId("com.mcpterminal.desktop");
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -234,10 +241,10 @@ if (!gotTheLock) {
 
   if (app.isPackaged) {
     // Portable mode: electron-builder sets PORTABLE_EXECUTABLE_DIR when running as portable exe
-    // In this case, store config next to the .exe instead of in userData
+    // Use a dedicated portable data directory, even alongside a legacy executable.
     const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
     if (portableDir) {
-      configDir = portableDir;
+      configDir = path.join(portableDir, "MCP Terminal Data");
     } else {
       configDir = path.join(app.getPath("userData"), "config");
     }
@@ -265,6 +272,13 @@ if (!gotTheLock) {
       updateTrayMenu(status);
     },
   );
+
+  serverManager.setMonitorCallback((snapshot) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("monitor:snapshot", snapshot);
+  });
+  ipcMain.handle("monitor:set", (_event, enabled: unknown) => {
+    if (typeof enabled === "boolean") serverManager?.setMonitoring(enabled);
+  });
 
   // IPC Handlers
   ipcMain.handle("server:start", async () => {
@@ -352,11 +366,20 @@ if (!gotTheLock) {
   });
 });
 
-app.on("before-quit", async () => {
+app.on("before-quit", (event) => {
   isQuitting = true;
-  if (serverManager) {
-    await serverManager.stop();
-  }
+  if (!serverManager || shutdownComplete) return;
+  // Electron does not await async event handlers. Hold the quit until the
+  // child server has released its port (or the manager's timeout expires).
+  event.preventDefault();
+  if (shutdownInProgress) return;
+  shutdownInProgress = true;
+  void serverManager.stop().catch((error) => {
+    console.error("Failed to stop MCP server during shutdown:", error);
+  }).finally(() => {
+    shutdownComplete = true;
+    app.quit();
+  });
 });
 
 app.on("window-all-closed", () => {
