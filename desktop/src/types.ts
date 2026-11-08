@@ -1,7 +1,14 @@
+export type TunnelProvider = "none" | "ngrok" | "tuna" | "cloudflare" | "localtunnel";
+export type TunnelState = "disabled" | "starting" | "connected" | "unverified" | "error";
+export const tunnelProviderLabels: Record<TunnelProvider, string> = { none: "Local only", ngrok: "ngrok", tuna: "Tuna", cloudflare: "Cloudflare", localtunnel: "LocalTunnel" };
 export interface ServerStatus {
   state: "offline" | "starting" | "running" | "error";
   port: number;
   host: string;
+  tunnelProvider: TunnelProvider;
+  tunnelState: TunnelState;
+  tunnelUrl?: string;
+  tunnelError?: string;
   ngrokEnabled: boolean;
   ngrokDomain?: string;
   ngrokUrl?: string;
@@ -33,6 +40,16 @@ export interface EnvConfig {
   MCP_API_KEY: string;
   FULL_ACCESS: string;
   FILES_ROOT: string;
+  TUNNEL_PROVIDER: TunnelProvider;
+  TUNA_EXECUTABLE: string;
+  TUNA_API_KEY: string;
+  TUNA_SUBDOMAIN: string;
+  CLOUDFLARED_EXECUTABLE: string;
+  CLOUDFLARE_MODE: "quick" | "named";
+  CLOUDFLARE_TUNNEL_TOKEN: string;
+  CLOUDFLARE_PUBLIC_URL: string;
+  LOCALTUNNEL_EXECUTABLE: string;
+  LOCALTUNNEL_SUBDOMAIN: string;
   NGROK_ENABLED: string;
   NGROK_AUTHTOKEN: string;
   NGROK_DOMAIN: string;

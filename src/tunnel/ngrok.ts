@@ -1,11 +1,15 @@
 import type NgrokNamespace from "@ngrok/ngrok";
 import { config } from "../config.js";
+import { tunnelStatus, redactTunnelError } from "./status.js";
 
 type NgrokType = typeof NgrokNamespace;
 let ngrokModule: NgrokType | null = null;
 let listener: Awaited<ReturnType<NgrokType["forward"]>> | null = null;
 let isShuttingDown = false;
 let reconnectAttempt = 0;
+let reconnectTimer: NodeJS.Timeout | undefined;
+let connecting = false;
+let generation = 0;
 
 async function getNgrok(): Promise<NgrokType> {
   if (!ngrokModule) {
@@ -13,7 +17,7 @@ async function getNgrok(): Promise<NgrokType> {
       const imported = await import("@ngrok/ngrok");
       ngrokModule = ((imported as unknown as { default?: NgrokType }).default ?? imported) as unknown as NgrokType;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = redactTunnelError(err);
       throw new Error(`Failed to load @ngrok/ngrok native module. Ensure that @ngrok/ngrok-win32-x64-msvc is available. Details: ${msg}`);
     }
   }
@@ -30,27 +34,32 @@ function reconnectDelay(attempt: number): number {
 
 async function connectNgrok(): Promise<string | null> {
   if (listener) {
+    connecting = true;
     try {
       await listener.close();
     } catch {
       // Ignore cleanup error
-    }
+    } finally { connecting = false; }
     listener = null;
   }
 
   const ngrok = await getNgrok();
 
   const forwardOptions: Parameters<typeof ngrok.forward>[0] = {
-    addr: config.port,
+    addr: "http://" + (["0.0.0.0", "::"].includes(config.host) ? "127.0.0.1" : config.host.includes(":") && !config.host.startsWith("[") ? "[" + config.host + "]" : config.host) + ":" + config.port,
     force_new_session: true,
     // onStatusChange: 'closed' fires when the tunnel drops; 'connected' fires on reconnect
     onStatusChange: (status: string) => {
-      if (isShuttingDown) return;
+      if (isShuttingDown || connecting) return;
       if (status === "closed") {
-        listener = null;
+        tunnelStatus("ngrok", "starting");
         console.warn(`[Ngrok] Tunnel status: closed. Reconnecting...`);
         void scheduleReconnect();
       } else if (status === "connected") {
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
+        const url = listener?.url();
+        if (url) tunnelStatus("ngrok", "connected", url);
         console.log(`[Ngrok] Tunnel status: reconnected.`);
         reconnectAttempt = 0;
       }
@@ -67,48 +76,37 @@ async function connectNgrok(): Promise<string | null> {
     forwardOptions.domain = config.ngrok.domain;
   }
 
-  listener = await ngrok.forward(forwardOptions);
+  const session = generation;
+  connecting = true;
+  let next: Awaited<ReturnType<NgrokType["forward"]>>;
+  try { next = await ngrok.forward(forwardOptions); } finally { connecting = false; }
+  if (isShuttingDown || session !== generation) { await next.close(); return null; }
+  listener = next;
 
   const tunnelUrl = listener.url();
 
   if (tunnelUrl) {
-    try {
-      const parsedHost = new URL(tunnelUrl).host.toLowerCase();
-      config.allowedHosts.add(parsedHost);
-    } catch {
-      // Ignore URL parse errors
-    }
-
-    printNotionBanner(tunnelUrl);
+    tunnelStatus("ngrok", "connected", tunnelUrl);
+    console.log(`[Tunnel] ngrok ready: ${tunnelUrl}/mcp`);
   }
 
   return tunnelUrl;
 }
 
-async function scheduleReconnect(): Promise<void> {
-  if (isShuttingDown) return;
-
-  const delay = reconnectDelay(reconnectAttempt);
-  reconnectAttempt++;
-
-  console.log(`[Ngrok] Reconnect attempt #${reconnectAttempt} in ${delay / 1000}s...`);
-  await new Promise((resolve) => setTimeout(resolve, delay));
-
-  if (isShuttingDown) return;
-
-  try {
-    await connectNgrok();
-    console.log(`[Ngrok] Tunnel reconnected successfully (attempt #${reconnectAttempt}).`);
-    reconnectAttempt = 0; // Reset backoff on success
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes("ERR_NGROK_334") || msg.includes("already online")) {
-      console.warn(`[Ngrok] Previous tunnel session is still releasing in ngrok cloud. Waiting to reconnect...`);
-    } else {
-      console.error(`[Ngrok] Reconnect attempt #${reconnectAttempt} failed: ${msg}`);
-    }
-    void scheduleReconnect();
-  }
+function scheduleReconnect(): void {
+  if (isShuttingDown || reconnectTimer) return;
+  const delay = reconnectDelay(reconnectAttempt++);
+  console.log("[Ngrok] Reconnect attempt #" + reconnectAttempt + " in " + delay / 1000 + "s...");
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined;
+    if (isShuttingDown) return;
+    void connectNgrok().then(() => { reconnectAttempt = 0; }).catch((error: unknown) => {
+      if (isShuttingDown) return;
+      console.warn("[Ngrok] Reconnect failed: " + redactTunnelError(error));
+      tunnelStatus("ngrok", "error", undefined, "Unable to connect to ngrok; check provider token and network. Retrying.");
+      scheduleReconnect();
+    });
+  }, delay);
 }
 
 export async function startNgrokTunnel(): Promise<string | null> {
@@ -116,15 +114,18 @@ export async function startNgrokTunnel(): Promise<string | null> {
     return null;
   }
 
+  ++generation;
   isShuttingDown = false;
   reconnectAttempt = 0;
+  tunnelStatus("ngrok", "starting");
 
   try {
     console.log("Starting ngrok tunnel...");
     return await connectNgrok();
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = redactTunnelError(error);
     console.error("[Ngrok] Failed to start tunnel:", msg);
+    tunnelStatus("ngrok", "error", undefined, "Unable to connect to ngrok; check token and network. Retrying.");
     // Schedule reconnect — don't give up on first failure
     void scheduleReconnect();
     return null;
@@ -132,7 +133,11 @@ export async function startNgrokTunnel(): Promise<string | null> {
 }
 
 export async function stopNgrokTunnel(): Promise<void> {
+  ++generation;
   isShuttingDown = true;
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = undefined;
+  tunnelStatus("ngrok", "disabled");
 
   if (listener) {
     try {
@@ -151,19 +156,4 @@ export async function stopNgrokTunnel(): Promise<void> {
       // Ignore disconnect errors on exit
     }
   }
-}
-
-function printNotionBanner(tunnelUrl: string): void {
-  const notionUrl = `${tunnelUrl}/mcp`;
-  console.log("");
-  console.log("============================================================");
-  console.log("             NOTION MCP AGENT CONNECTION READY             ");
-  console.log("============================================================");
-  console.log(`URL to paste into Notion:  ${notionUrl}`);
-  console.log("");
-  console.log("Authentication Header:");
-  console.log("  Header Name:   Authorization");
-  console.log(`  Header Value:  Bearer ${config.apiKey}`);
-  console.log("============================================================");
-  console.log("Keep this process running. Press Ctrl+C to stop.\n");
 }

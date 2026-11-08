@@ -29,7 +29,12 @@ const COMMAND_TIMEOUT_MS = integerEnv("COMMAND_TIMEOUT_MS", 120_000);
 const MAX_OUTPUT_BYTES = integerEnv("MAX_OUTPUT_BYTES", 1_048_576);
 const MAX_FILE_BYTES = integerEnv("MAX_FILE_BYTES", 10_485_760);
 
-const NGROK_ENABLED = booleanEnv("NGROK_ENABLED", false);
+const requestedProvider = (process.env.TUNNEL_PROVIDER || "").trim().toLowerCase();
+if (requestedProvider && !["none", "ngrok", "tuna", "cloudflare", "localtunnel"].includes(requestedProvider)) throw new Error("Unsupported TUNNEL_PROVIDER. Choose none, ngrok, tuna, cloudflare or localtunnel.");
+const TUNNEL_PROVIDER = ["none", "ngrok", "tuna", "cloudflare", "localtunnel"].includes(requestedProvider)
+  ? requestedProvider as "none" | "ngrok" | "tuna" | "cloudflare" | "localtunnel"
+  : booleanEnv("NGROK_ENABLED", false) ? "ngrok" : "none";
+const NGROK_ENABLED = TUNNEL_PROVIDER === "ngrok";
 const NGROK_AUTHTOKEN = (process.env.NGROK_AUTHTOKEN || process.env.NGROK_TOKEN || "").trim();
 const NGROK_DOMAIN = (process.env.NGROK_DOMAIN || "").trim();
 
@@ -61,6 +66,18 @@ export const config = {
   maxOutputBytes: MAX_OUTPUT_BYTES,
   maxFileBytes: MAX_FILE_BYTES,
   allowedHosts: ALLOWED_HOSTS,
+  tunnelProvider: TUNNEL_PROVIDER,
+  tuna: { executable: (process.env.TUNA_EXECUTABLE || "tuna").trim(), apiKey: (process.env.TUNA_API_KEY || "").trim(), subdomain: (process.env.TUNA_SUBDOMAIN || "").trim() },
+  cloudflare: {
+    executable: (process.env.CLOUDFLARED_EXECUTABLE || "cloudflared").trim(),
+    mode: process.env.CLOUDFLARE_MODE === "named" ? "named" as const : "quick" as const,
+    token: (process.env.CLOUDFLARE_TUNNEL_TOKEN || "").trim(),
+    publicUrl: (process.env.CLOUDFLARE_PUBLIC_URL || "").trim(),
+  },
+  localtunnel: {
+    executable: (process.env.LOCALTUNNEL_EXECUTABLE || "lt").trim(),
+    subdomain: (process.env.LOCALTUNNEL_SUBDOMAIN || "").trim(),
+  },
   ngrok: {
     enabled: NGROK_ENABLED,
     authtoken: NGROK_AUTHTOKEN || undefined,

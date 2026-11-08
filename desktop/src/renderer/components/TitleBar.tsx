@@ -1,7 +1,7 @@
 import React from "react";
 import { Minus, Square, X, Shield, Globe, ArrowDownToLine } from "lucide-react";
 import stationIcon from "../../../icon.svg";
-import type { ServerStatus } from "../../types";
+import { tunnelProviderLabels, type ServerStatus } from "../../types";
 
 
 
@@ -52,10 +52,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({ status, onOpenSettings }) =>
           <span className="text-[11px] text-slate-400 font-mono">Port {status.port}</span>
         </div>
 
-        {status.ngrokUrl && (
+        {status.tunnelUrl && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 text-xs font-mono">
             <Globe className="w-3 h-3 text-cyan-400" />
-            <span className="text-[11px] font-medium">Ngrok Live</span>
+            <span className="text-[11px] font-medium">{tunnelProviderLabels[status.tunnelProvider]} · {status.tunnelState === "unverified" ? "Unverified" : "Connected"}</span>
           </div>
         )}
 

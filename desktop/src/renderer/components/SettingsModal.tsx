@@ -1,279 +1,92 @@
-import React, { useEffect, useState } from "react";
-import { X, Save, RefreshCw, Folder, Key, Globe, Shield, Terminal, Check } from "lucide-react";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import { AlertCircle, Check, Eye, EyeOff, Folder, KeyRound, LoaderCircle, Palette, RefreshCw, Save, Server, Settings2, Shield } from "lucide-react";
 import type { EnvConfig } from "../../types";
-
-
-
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Switch } from "../lib/shadcn/ui";
+import { SettingsField } from "./SettingsField";
+import { TunnelSettings } from "./TunnelSettings";
+import "../styles/settings.css";
 interface SettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-  animation: boolean;
-  onAnimationChange: (enabled: boolean) => void;
+  isOpen: boolean; onClose: () => void; onSaved: () => void;
+  animation: boolean; onAnimationChange: (enabled: boolean) => void;
+  backgroundAnimation: boolean; onBackgroundAnimationChange: (enabled: boolean) => void;
+  reducedMotion: boolean;
 }
-
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSaved, animation, onAnimationChange }) => {
+export function SettingsModal({ isOpen, onClose, onSaved, animation, onAnimationChange, backgroundAnimation, onBackgroundAnimationChange, reducedMotion }: SettingsModalProps) {
   const [config, setConfig] = useState<EnvConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-
+  const [error, setError] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const keyId = useId(); const rootId = useId();
   useEffect(() => {
-    if (isOpen) {
-      void loadConfig();
-    }
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoading(true); setError(""); setSavedSuccess(false); setConfig(null); setShowKey(false);
+    void window.electronAPI.getConfig().then(value => { if (!cancelled) setConfig(value); }).catch(() => { if (!cancelled) setError("Unable to load configuration. Close settings and try again."); }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [isOpen]);
-
-  const loadConfig = async () => {
-    setLoading(true);
-    const env = await window.electronAPI.getConfig();
-    setConfig(env);
-    setLoading(false);
+  const updateConfig = (value: EnvConfig) => { setConfig(value); setSavedSuccess(false); setError(""); };
+  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); if (!config || saving) return;
+    setSaving(true); setError(""); setSavedSuccess(false);
+    try {
+      const result = await window.electronAPI.saveConfig(config);
+      if (result.success) { setSavedSuccess(true); onSaved(); }
+      else setError(result.error || "Unable to save settings. Your running server was not restarted.");
+    } catch { setError("Unable to save settings. Check the configuration folder permissions and try again."); }
+    finally { setSaving(false); }
   };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!config) return;
-    setSaving(true);
-    const res = await window.electronAPI.saveConfig(config);
-    setSaving(false);
-    if (res.success) {
-      setSavedSuccess(true);
-      setTimeout(() => {
-        setSavedSuccess(false);
-        onSaved();
-        onClose();
-      }, 1000);
-    }
+  const selectFolder = async () => {
+    try { const selected = await window.electronAPI.selectFolder(); if (selected) setConfig(current => current ? { ...current, FILES_ROOT: selected } : current); setSavedSuccess(false); }
+    catch { setError("Unable to open the folder picker."); }
   };
-
-  const handleSelectFolder = async () => {
-    const selected = await window.electronAPI.selectFolder();
-    if (selected && config) {
-      setConfig({ ...config, FILES_ROOT: selected });
-    }
+  const generateKey = async () => {
+    try { const token = await window.electronAPI.generateToken(); setConfig(current => current ? { ...current, MCP_API_KEY: token } : current); setSavedSuccess(false); }
+    catch { setError("Unable to generate a key."); }
   };
-
-  const handleGenerateToken = async () => {
-    const token = await window.electronAPI.generateToken();
-    if (config) {
-      setConfig({ ...config, MCP_API_KEY: token });
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl liquid-glass border border-white/10 shadow-2xl p-6 flex flex-col max-h-[90vh]">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Terminal className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">Server Settings</h2>
-              <p className="text-xs text-slate-400">Modify configuration parameters stored in .env</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+  return <Dialog open={isOpen} onOpenChange={open => { if (!open && !saving) onClose(); }}>
+    <DialogContent onCloseAutoFocus={event => { event.preventDefault(); document.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]')?.focus(); }} onEscapeKeyDown={event => { if (saving) event.preventDefault(); }} onInteractOutside={event => event.preventDefault()}>
+      <div className="settings-header"><div className="settings-header-icon"><Settings2 size={21}/></div><div><DialogTitle className="settings-title">Server settings</DialogTitle><DialogDescription className="settings-description">Liquid Glass workspace · Connection, appearance and security</DialogDescription></div></div>
+      {loading ? <div className="settings-loading" role="status"><LoaderCircle className="animate-spin functional-motion" size={24}/><span>Loading configuration…</span></div>
+      : !config ? <div className="settings-loading"><p role="alert">{error}</p><Button onClick={onClose}>Close settings</Button></div>
+      : <form className="settings-form" onSubmit={event => void handleSave(event)}>
+        <div className="settings-body">
+          <section className="settings-section" aria-labelledby="appearance-section">
+            <h3 className="settings-section-heading" id="appearance-section"><Palette/> Appearance</h3>
+            <div className="settings-toggle-row"><div><label htmlFor="interface-motion">Interface animations</label><p id="interface-motion-note">Soft transitions, button feedback and traffic particles. Saved on this device.</p></div><Switch id="interface-motion" checked={animation} onCheckedChange={onAnimationChange} aria-describedby="interface-motion-note"/></div>
+            <div className="settings-toggle-row"><div><label htmlFor="background-motion">Background animations</label><p id="background-motion-note">Slow aurora movement. Turning this off stops the animation, not monitoring.</p></div><Switch id="background-motion" checked={backgroundAnimation} onCheckedChange={onBackgroundAnimationChange} aria-describedby="background-motion-note"/></div>
+            {reducedMotion && <p className="settings-note">System Reduced Motion is active. Decorative motion stays off regardless of these preferences.</p>}
+          </section>
+          <fieldset disabled={saving} className="contents">
+            <TunnelSettings config={config} onChange={updateConfig}/>
+            <section className="settings-section" aria-labelledby="server-section">
+              <h3 className="settings-section-heading" id="server-section"><Server/> Server</h3>
+              <div className="settings-grid">
+                <SettingsField config={config} onChange={updateConfig} name="PORT" label="Listen port" required type="number" min={1} max={65535}/>
+                <SettingsField config={config} onChange={updateConfig} name="HOST" label="Listen host" required placeholder="127.0.0.1" note="Prefer loopback when using a tunnel."/>
+                <SettingsField config={config} onChange={updateConfig} name="COMMAND_TIMEOUT_MS" label="Command timeout · ms" type="number" min={1} required/>
+                <SettingsField config={config} onChange={updateConfig} name="MAX_OUTPUT_BYTES" label="Max command output · bytes" type="number" min={1} required/>
+                <SettingsField config={config} onChange={updateConfig} name="MAX_FILE_BYTES" label="Max file payload · bytes" type="number" min={1} required/>
+              </div>
+            </section>
+            <section className="settings-section" aria-labelledby="security-section">
+              <h3 className="settings-section-heading" id="security-section"><Shield/> Security & sandbox</h3>
+              <div className="settings-field"><label htmlFor={keyId}>MCP Bearer API key</label><div className="settings-actions-row">
+                <Input id={keyId} type={showKey ? "text" : "password"} autoComplete="new-password" required minLength={32} value={config.MCP_API_KEY} onChange={event => updateConfig({ ...config, MCP_API_KEY: event.target.value })} aria-describedby={keyId + "-note"}/>
+                <Button size="icon" aria-label={showKey ? "Hide MCP key" : "Show MCP key"} onClick={() => setShowKey(value => !value)}>{showKey ? <EyeOff/> : <Eye/>}</Button>
+                <Button size="sm" onClick={() => void generateKey()}><KeyRound/> Generate</Button>
+              </div><small id={keyId + "-note"}>At least 32 characters. Agents use Authorization: Bearer &lt;key&gt;. Rotating this key takes effect after restarting the server.</small></div>
+              <div className="settings-toggle-row mt-3"><div><label htmlFor="full-access">Unrestricted host access</label><p>Off keeps filesystem access inside the sandbox. Enable only for agents you fully trust.</p></div><Switch id="full-access" checked={config.FULL_ACCESS === "true"} onCheckedChange={enabled => updateConfig({ ...config, FULL_ACCESS: String(enabled) })}/></div>
+              <div className="settings-field mt-3"><label htmlFor={rootId}>Sandbox root directory</label><div className="settings-actions-row"><Input id={rootId} value={config.FILES_ROOT} required onChange={event => updateConfig({ ...config, FILES_ROOT: event.target.value })}/><Button size="sm" onClick={() => void selectFolder()}><Folder/> Browse</Button></div></div>
+              <div className="mt-3"><SettingsField config={config} onChange={updateConfig} name="ALLOWED_HOSTS" label="Allowed Host headers" note="Separate entries with semicolons. The active tunnel adds only its exact hostname for that session. Do not use a global wildcard." required/></div>
+            </section>
+          </fieldset>
+          {error && <div className="settings-alert settings-error" role="alert"><AlertCircle/><p>{error}</p></div>}
+          {savedSuccess && <div className="settings-alert" role="status"><Check/><p>Settings saved. Restart the server explicitly to apply connection or security changes. The active server was not interrupted.</p></div>}
         </div>
-
-        {/* Modal Body */}
-        {loading || !config ? (
-          <div className="py-16 flex flex-col items-center justify-center text-slate-400 text-xs gap-3">
-            <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-            <span>Loading configuration...</span>
-          </div>
-        ) : (
-          <form onSubmit={handleSave} className="overflow-y-auto py-4 space-y-4 pr-1">
-            <div className="appearance-setting">
-              <div><span>Interface animations</span><p>Animated gradient and traffic particles. Saved on this device.</p></div>
-              <label className="appearance-switch"><input type="checkbox" checked={animation} onChange={(e) => onAnimationChange(e.target.checked)} aria-label="Interface animations"/><span/></label>
-            </div>
-            {/* API Key */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-violet-400" />
-                  MCP Secret API Key (MCP_API_KEY)
-                </label>
-                <button
-                  type="button"
-                  onClick={handleGenerateToken}
-                  className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Generate 64-char key
-                </button>
-              </div>
-              <input
-                type="text"
-                required
-                minLength={32}
-                value={config.MCP_API_KEY}
-                onChange={(e) => setConfig({ ...config, MCP_API_KEY: e.target.value })}
-                className="w-full h-9 px-3 rounded-xl bg-slate-950/80 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50"
-              />
-            </div>
-
-            {/* Network Ports & Hosts */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Port (PORT)</label>
-                <input
-                  type="number"
-                  value={config.PORT}
-                  onChange={(e) => setConfig({ ...config, PORT: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-slate-950/80 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Host (HOST)</label>
-                <input
-                  type="text"
-                  value={config.HOST}
-                  onChange={(e) => setConfig({ ...config, HOST: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-slate-950/80 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                />
-              </div>
-            </div>
-
-            {/* Ngrok Tunnel Section */}
-            <div className="p-4 rounded-2xl bg-slate-950/40 border border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-cyan-400" />
-                  <span className="text-xs font-bold text-white">Ngrok Public Tunnel</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.NGROK_ENABLED === "true"}
-                    onChange={(e) =>
-                      setConfig({ ...config, NGROK_ENABLED: e.target.checked ? "true" : "false" })
-                    }
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500" />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-slate-400">Static Domain (e.g. xyz.ngrok-free.app)</label>
-                  <input
-                    type="text"
-                    value={config.NGROK_DOMAIN}
-                    placeholder="your-name.ngrok-free.app"
-                    onChange={(e) => setConfig({ ...config, NGROK_DOMAIN: e.target.value })}
-                    className="w-full h-8 px-2.5 rounded-lg bg-slate-900 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-slate-400">Auth Token (Optional)</label>
-                  <input
-                    type="password"
-                    value={config.NGROK_AUTHTOKEN}
-                    placeholder="ngrok token (if not global)"
-                    onChange={(e) => setConfig({ ...config, NGROK_AUTHTOKEN: e.target.value })}
-                    className="w-full h-8 px-2.5 rounded-lg bg-slate-900 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Security & Sandbox */}
-            <div className="p-4 rounded-2xl bg-slate-950/40 border border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-white">Filesystem Sandbox</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-400">Unrestricted Full Access:</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.FULL_ACCESS === "true"}
-                      onChange={(e) =>
-                        setConfig({ ...config, FULL_ACCESS: e.target.checked ? "true" : "false" })
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-amber-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-slate-400">Sandbox Root Directory (FILES_ROOT)</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={config.FILES_ROOT}
-                    onChange={(e) => setConfig({ ...config, FILES_ROOT: e.target.value })}
-                    className="flex-1 h-8 px-2.5 rounded-lg bg-slate-900 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSelectFolder}
-                    className="px-3 h-8 rounded-lg liquid-glass-btn text-xs font-medium text-slate-300 hover:text-white flex items-center gap-1.5 shrink-0"
-                  >
-                    <Folder className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Browse...</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Allowed Hosts */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Allowed Host Headers (ALLOWED_HOSTS)</label>
-              <input
-                type="text"
-                value={config.ALLOWED_HOSTS}
-                onChange={(e) => setConfig({ ...config, ALLOWED_HOSTS: e.target.value })}
-                className="w-full h-8 px-2.5 rounded-lg bg-slate-950/80 border border-white/10 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50"
-              />
-            </div>
-
-            {/* Save Actions */}
-            <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/5">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg shadow-cyan-500/20 border border-white/10 transition-all hover:scale-[1.02] disabled:opacity-50"
-              >
-                {savedSuccess ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-300" />
-                    <span>Saved!</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>{saving ? "Saving..." : "Save Changes"}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-};
+        <div className="settings-footer"><p>Appearance is saved automatically. Server changes require a restart; your running tunnel stays active.</p><div className="settings-footer-buttons"><Button variant="ghost" onClick={onClose} disabled={saving}>{savedSuccess ? "Done" : "Cancel"}</Button><Button type="submit" variant="default" disabled={saving || savedSuccess}>{saving ? <RefreshCw className="animate-spin functional-motion"/> : savedSuccess ? <Check/> : <Save/>}{saving ? "Saving…" : savedSuccess ? "Saved" : "Save changes"}</Button></div></div>
+      </form>}
+    </DialogContent>
+  </Dialog>;
+}

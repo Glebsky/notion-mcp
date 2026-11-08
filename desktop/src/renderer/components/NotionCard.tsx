@@ -1,26 +1,32 @@
-import React, { useState } from "react";
+import { useEffect, useRef, useState, type FC } from "react";
 import { Check, Copy, Key, Link2, Sparkles, AlertCircle, Globe, Eye, EyeOff, Server } from "lucide-react";
-import type { ServerStatus } from "../../types";
+import { tunnelProviderLabels, type ServerStatus } from "../../types";
 
 interface NotionCardProps {
   status: ServerStatus;
 }
 
-export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
+export const NotionCard: FC<NotionCardProps> = ({ status }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showToken, setShowToken] = useState(false);
 
-  const localMcpUrl = `http://${status.host || "127.0.0.1"}:${status.port}/mcp`;
-  const ngrokBaseUrl = status.ngrokUrl || "";
-  const ngrokMcpUrl = ngrokBaseUrl ? `${ngrokBaseUrl}/mcp` : "";
+  const host = ["0.0.0.0", "::", "[::]"].includes(status.host) ? "127.0.0.1" : status.host || "127.0.0.1";
+  const localMcpUrl = `http://${host.includes(":") && !host.startsWith("[") ? `[${host}]` : host}:${status.port}/mcp`;
+  const tunnelBaseUrl = status.tunnelUrl || "";
+  const providerLabel = tunnelProviderLabels[status.tunnelProvider];
+  const publicMcpUrl = tunnelBaseUrl ? `${tunnelBaseUrl}/mcp` : "";
 
-  const copyToClipboard = (text: string, fieldName: string) => {
+  const [copyError, setCopyError] = useState("");
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+  const copyToClipboard = async (text: string, fieldName: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldName);
-    setTimeout(() => {
-      setCopiedField(null);
-    }, 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyError(""); setCopiedField(fieldName);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopiedField(null), 2000);
+    } catch { setCopyError("Clipboard is unavailable. Select the displayed value and copy it manually."); }
   };
 
   const isLive = status.state === "running";
@@ -42,15 +48,15 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
           </div>
         </div>
 
-        {status.ngrokUrl ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Ngrok Public Live
+        {status.tunnelUrl && isLive ? (
+          <span className="endpoint-badge" data-state={status.tunnelState}>
+            <span className="endpoint-status-dot" />
+            {providerLabel} · {status.tunnelState === "unverified" ? "Unverified" : "Connected"}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono">
             <AlertCircle className="w-3.5 h-3.5" />
-            Localhost Only (Ngrok Off)
+            {status.state === "offline" || status.state === "error" ? "Server offline" : status.tunnelState === "error" ? `${providerLabel}: error` : status.tunnelState === "starting" ? `${providerLabel}: connecting` : "Local only"}
           </span>
         )}
       </div>
@@ -62,11 +68,11 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <Link2 className="w-3 h-3 text-cyan-400" />
-              Public MCP URL (Ngrok /mcp)
+              Public MCP URL
             </span>
             <button
-              onClick={() => copyToClipboard(ngrokMcpUrl || localMcpUrl, "publicMcpUrl")}
-              disabled={!isLive}
+              onClick={() => copyToClipboard(publicMcpUrl, "publicMcpUrl")}
+              disabled={!isLive || !publicMcpUrl}
               className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-40"
             >
               {copiedField === "publicMcpUrl" ? (
@@ -84,7 +90,7 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
           </div>
           <div className="font-mono text-xs text-slate-200 truncate bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-white/5 select-all">
             {isLive
-              ? ngrokMcpUrl || `${localMcpUrl} (Local)`
+              ? publicMcpUrl || status.tunnelError || (status.tunnelState === "starting" ? "Connecting tunnel…" : "No public tunnel")
               : "Server offline. Start server to get URL."}
           </div>
         </div>
@@ -132,6 +138,7 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
                 onClick={() => setShowToken(!showToken)}
                 className="text-slate-500 hover:text-slate-300 transition-colors"
                 title={showToken ? "Hide token" : "Show token"}
+                aria-label={showToken ? "Hide token" : "Show token"}
               >
                 {showToken ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
               </button>
@@ -198,16 +205,19 @@ export const NotionCard: React.FC<NotionCardProps> = ({ status }) => {
         </div>
       </div>
 
-      {/* Optional helper row if Ngrok base domain is active */}
-      {status.ngrokUrl && (
+      {copyError && <p role="alert" className="endpoint-warning">{copyError}</p>}
+      {status.tunnelError && <p role="alert" className="endpoint-warning">{status.tunnelError}</p>}
+      {status.tunnelUrl && <p className="text-xs text-slate-400">Public address assigned by {providerLabel}. An external MCP connection has not been verified; use Authorization: Bearer with your MCP key.</p>}
+      {/* Public tunnel address */}
+      {status.tunnelUrl && (
         <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/40 border border-white/5 text-xs">
           <div className="flex items-center gap-2 text-slate-400">
             <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="text-[11px]">Ngrok Base Domain:</span>
-            <span className="font-mono text-slate-300 select-all">{ngrokBaseUrl}</span>
+            <span className="text-[11px]">{providerLabel} Base Domain:</span>
+            <span className="font-mono text-slate-300 select-all">{tunnelBaseUrl}</span>
           </div>
           <button
-            onClick={() => copyToClipboard(ngrokBaseUrl, "ngrokBase")}
+            onClick={() => copyToClipboard(tunnelBaseUrl, "ngrokBase")}
             className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
           >
             {copiedField === "ngrokBase" ? (

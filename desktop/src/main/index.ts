@@ -1,10 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Tray, nativeImage } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, Tray, nativeImage } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { ServerManager } from "./server-manager.js";
-import type { ServerStatus } from "../types.js";
+import { tunnelProviderLabels, type ServerStatus } from "../types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -154,11 +154,18 @@ function updateTrayMenu(status?: ServerStatus) {
     },
   ];
 
-  if (currentStatus?.ngrokUrl) {
+  template.push({ label: `Tunnel: ${currentStatus ? tunnelProviderLabels[currentStatus.tunnelProvider] : "Local only"} · ${currentStatus?.tunnelState || "disabled"}`, enabled: false });
+  if (currentStatus?.state === "running") {
+    const host = ["0.0.0.0", "::", "[::]"].includes(currentStatus.host) ? "127.0.0.1" : currentStatus.host;
+    const authority = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+    const mcpUrl = `${currentStatus.tunnelUrl || `http://${authority}:${currentStatus.port}`}/mcp`;
+    template.push({ label: currentStatus.tunnelState === "unverified" ? "Copy MCP URL (unverified)" : "Copy MCP URL", click: () => clipboard.writeText(mcpUrl) });
+  }
+  if (currentStatus?.tunnelUrl) {
     template.push({
-      label: "🌐 Открыть Ngrok Live URL",
+      label: "🌐 Открыть публичный адрес",
       click: () => {
-        if (currentStatus.ngrokUrl) void shell.openExternal(currentStatus.ngrokUrl);
+        if (currentStatus.tunnelUrl) void shell.openExternal(currentStatus.tunnelUrl);
       },
     });
   }

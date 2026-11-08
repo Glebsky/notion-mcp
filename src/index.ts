@@ -1,7 +1,7 @@
 import { config } from "./config.js";
 import { createApp, getActiveSessions } from "./server.js";
 import { setMonitoringEnabled } from "./monitor.js";
-import { startNgrokTunnel, stopNgrokTunnel } from "./tunnel/ngrok.js";
+import { startTunnel, stopTunnel } from "./tunnel/index.js";
 
 const app = createApp();
 
@@ -11,7 +11,8 @@ const httpServer = app.listen(config.port, config.host, async () => {
     `Filesystem mode: ${config.fullAccess ? "FULL HOST ACCESS (UNRESTRICTED)" : `restricted to ${config.filesRoot}`}`,
   );
 
-  await startNgrokTunnel();
+  if (process.connected && process.send) process.send({ type: "server:ready" }, () => {});
+  await startTunnel();
 });
 
 // Set server-level keepalive timeout to match transport headers
@@ -24,6 +25,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
   isShuttingDown = true;
   console.log(`\nReceived ${signal}, shutting down gracefully...`);
 
+  setTimeout(() => {
+    console.warn("Forced shutdown after timeout.");
+    process.exit(0);
+  }, 3000).unref();
+
+  // Close the public connector first, even if session teardown stalls.
+  await stopTunnel();
+
   // Close all active MCP sessions
   const sessions = getActiveSessions();
   if (sessions.size > 0) {
@@ -32,17 +41,12 @@ async function gracefulShutdown(signal: string): Promise<void> {
     sessions.clear();
   }
 
-  await stopNgrokTunnel();
-
   httpServer.close(() => {
     console.log("MCP HTTP server closed.");
     process.exit(0);
   });
 
-  setTimeout(() => {
-    console.warn("Forced shutdown after timeout.");
-    process.exit(0);
-  }, 3000).unref();
+
 }
 
 process.on("SIGINT", () => {

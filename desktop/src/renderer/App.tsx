@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useMotionPreferences } from "./hooks/useMotionPreferences";
+import { Button } from "./lib/shadcn/ui";
+import "./appTheme.css";
 import { Activity, Pause, Play, Terminal } from "lucide-react";
 import { TitleBar } from "./components/TitleBar";
 import { NotionCard } from "./components/NotionCard";
@@ -8,14 +11,12 @@ import { SettingsModal } from "./components/SettingsModal";
 import { Monitor } from "./components/Monitor";
 import type { LogEntry, MonitorSnapshot, ServerStatus } from "../types";
 
-export const App: React.FC = () => {
-  const [status, setStatus] = useState<ServerStatus>({ state: "offline", port: 3100, host: "127.0.0.1", ngrokEnabled: false, apiKey: "", fullAccess: false, filesRoot: "./workspace" });
+export const App = () => {
+  const [status, setStatus] = useState<ServerStatus>({ state: "offline", port: 3100, host: "127.0.0.1", tunnelProvider: "none", tunnelState: "disabled", ngrokEnabled: false, apiKey: "", fullAccess: false, filesRoot: "./workspace" });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [animation, setAnimation] = useState(() => {
-    const saved = localStorage.getItem("mcp-terminal-animation");
-    return saved === null ? !window.matchMedia("(prefers-reduced-motion: reduce)").matches : saved === "true";
-  });
+  const { animation, setAnimation, backgroundAnimation, setBackgroundAnimation, reducedMotion, interfaceMotion, backgroundMotion } = useMotionPreferences();
+  const [needsRestart, setNeedsRestart] = useState(false);
   const [monitoring, setMonitoring] = useState(() => localStorage.getItem("mcp-terminal-monitoring") !== "false");
   const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null);
   const [tab, setTab] = useState<"logs" | "monitor">("monitor");
@@ -27,7 +28,7 @@ export const App: React.FC = () => {
     const unsubMonitor = window.electronAPI.onMonitoring(setSnapshot);
     return () => { unsubStatus(); unsubLogs(); unsubMonitor(); };
   }, []);
-  useEffect(() => { localStorage.setItem("mcp-terminal-animation", String(animation)); }, [animation]);
+  useEffect(() => { if (status.state === "starting") setNeedsRestart(false); }, [status.state]);
   useEffect(() => {
     localStorage.setItem("mcp-terminal-monitoring", String(monitoring));
     setSnapshot(null);
@@ -37,10 +38,12 @@ export const App: React.FC = () => {
 
   const toggleMonitor = () => { setMonitoring((value) => !value); if (monitoring) setTab("logs"); else setTab("monitor"); };
   return (
-    <div className={`app-shell ${animation ? "" : "motion-off"}`}>
+    <div className={`app-shell ${interfaceMotion ? "" : "motion-off"} ${backgroundMotion ? "" : "background-motion-off"}`}>
       <div className="aurora aurora-one"/><div className="aurora aurora-two"/><div className="aurora aurora-three"/>
       <TitleBar status={status} onOpenSettings={() => setIsSettingsOpen(true)} />
       <main className="dashboard">
+        {status.error && <div className="settings-alert settings-error" role="alert">{status.error}</div>}
+        {needsRestart && <div className="settings-restart-note" role="status"><span>Server settings saved. Start or restart the server to apply them; the active connection has not changed.</span><Button size="sm" variant="ghost" onClick={() => setNeedsRestart(false)}>Dismiss</Button></div>}
         <Controls status={status} onStart={() => void window.electronAPI.startServer()} onStop={() => void window.electronAPI.stopServer()} onRestart={() => void window.electronAPI.restartServer()} onOpenSettings={() => setIsSettingsOpen(true)} />
         <NotionCard status={status}/>
         <div className="workspace-nav">
@@ -51,10 +54,10 @@ export const App: React.FC = () => {
           <button className="monitor-toggle" onClick={toggleMonitor} aria-pressed={monitoring}>{monitoring ? <Pause size={13}/> : <Play size={13}/>} {monitoring ? "Pause monitoring" : "Enable monitoring"}</button>
         </div>
         <div className="workspace-body">
-          {tab === "monitor" ? monitoring ? <Monitor snapshot={snapshot} status={status} animation={animation}/> : <div className="monitor-paused liquid-glass-card"><Pause size={25}/><h2>Monitoring paused</h2><p>Traffic collection is disabled. Logs continue as usual.</p><button className="liquid-glass-btn" onClick={toggleMonitor}>Enable monitoring</button></div> : <LogViewer logs={logs} onClear={() => { setLogs([]); void window.electronAPI.clearLogs(); }}/>}
+          {tab === "monitor" ? monitoring ? <Monitor snapshot={snapshot} status={status} animation={interfaceMotion}/> : <div className="monitor-paused liquid-glass-card"><Pause size={25}/><h2>Monitoring paused</h2><p>Traffic collection is disabled. Logs continue as usual.</p><button className="liquid-glass-btn" onClick={toggleMonitor}>Enable monitoring</button></div> : <LogViewer logs={logs} onClear={() => { setLogs([]); void window.electronAPI.clearLogs(); }}/>}
         </div>
       </main>
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onSaved={() => void window.electronAPI.getServerStatus().then(setStatus)} animation={animation} onAnimationChange={setAnimation}/>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onSaved={() => { setNeedsRestart(true); void window.electronAPI.getServerStatus().then(setStatus); }} animation={animation} onAnimationChange={setAnimation} backgroundAnimation={backgroundAnimation} onBackgroundAnimationChange={setBackgroundAnimation} reducedMotion={reducedMotion}/>
     </div>
   );
 };

@@ -2,14 +2,18 @@ import { spawn, type ChildProcess } from "node:child_process";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
+import dotenv from "dotenv";
 import type { EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
 
 export class ServerManager {
   private process: ChildProcess | null = null;
+  private startTask: Promise<{ success: boolean; error?: string }> | null = null;
   private status: ServerStatus = {
     state: "offline",
     port: 3100,
     host: "127.0.0.1",
+    tunnelProvider: "none",
+    tunnelState: "disabled",
     ngrokEnabled: false,
     apiKey: "",
     fullAccess: false,
@@ -31,7 +35,7 @@ export class ServerManager {
   constructor(projectRoot: string, configDir: string) {
     this.projectRoot = projectRoot;
     this.configDir = configDir;
-    void this.init();
+    void this.init().catch(() => { this.updateStatus({ state: "error", error: "Unable to load local configuration. Check the .env file and folder permissions." }); });
   }
 
   private async init() {
@@ -100,7 +104,7 @@ export class ServerManager {
         `MCP_API_KEY=${defaultApiKey}`,
         `PORT=3100`,
         `HOST=127.0.0.1`,
-        `ALLOWED_HOSTS=localhost:3100;127.0.0.1:3100;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com`,
+        `ALLOWED_HOSTS=localhost:3100;127.0.0.1:3100`,
         `NGROK_ENABLED=false`,
         `NGROK_AUTHTOKEN=`,
         `NGROK_DOMAIN=`,
@@ -130,10 +134,20 @@ export class ServerManager {
       MCP_API_KEY: "",
       FULL_ACCESS: "false",
       FILES_ROOT: path.join(this.configDir, "workspace"),
+      TUNNEL_PROVIDER: "none",
+      TUNA_EXECUTABLE: "",
+      TUNA_API_KEY: "",
+      TUNA_SUBDOMAIN: "",
+      CLOUDFLARED_EXECUTABLE: "",
+      CLOUDFLARE_MODE: "quick",
+      CLOUDFLARE_TUNNEL_TOKEN: "",
+      CLOUDFLARE_PUBLIC_URL: "",
+      LOCALTUNNEL_EXECUTABLE: "",
+      LOCALTUNNEL_SUBDOMAIN: "",
       NGROK_ENABLED: "false",
       NGROK_AUTHTOKEN: "",
       NGROK_DOMAIN: "",
-      ALLOWED_HOSTS: "localhost:3100;127.0.0.1:3100;*.ngrok-free.app;*.ngrok.app;*.ngrok-free.dev;*.trycloudflare.com",
+      ALLOWED_HOSTS: "localhost:3100;127.0.0.1:3100",
       COMMAND_TIMEOUT_MS: "120000",
       MAX_OUTPUT_BYTES: "1048576",
       MAX_FILE_BYTES: "10485760",
@@ -141,19 +155,14 @@ export class ServerManager {
 
     try {
       const content = await fs.readFile(envPath, "utf8");
-      const lines = content.split(/\r?\n/);
-      const parsed: Record<string, string> = {};
-
-      for (const line of lines) {
-        const match = line.match(/^\s*([^#][^=]*?)\s*=\s*(.*)$/);
-        if (match) {
-          parsed[match[1].trim()] = match[2].trim();
-        }
-      }
-
-      return { ...defaultConfig, ...parsed };
-    } catch {
-      return defaultConfig;
+      const parsed = dotenv.parse(content);
+      const requested = (parsed.TUNNEL_PROVIDER || "").trim().toLowerCase();
+      if (requested && !["none", "ngrok", "tuna", "cloudflare", "localtunnel"].includes(requested)) throw new Error("Unsupported tunnel provider in local configuration");
+      const provider = (requested || (/^true$/i.test(parsed.NGROK_ENABLED || "") ? "ngrok" : "none")) as EnvConfig["TUNNEL_PROVIDER"];
+      return { ...defaultConfig, ...parsed, TUNNEL_PROVIDER: provider, NGROK_ENABLED: provider === "ngrok" ? "true" : "false", NGROK_AUTHTOKEN: parsed.NGROK_AUTHTOKEN || parsed.NGROK_TOKEN || "", CLOUDFLARE_MODE: parsed.CLOUDFLARE_MODE === "named" ? "named" : "quick" };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return defaultConfig;
+      throw new Error("Unable to read local configuration. Check the provider name and file permissions.");
     }
   }
 
@@ -162,6 +171,15 @@ export class ServerManager {
       await this.ensureEnvExists();
       const current = await this.getEnvConfig();
       const updated = { ...current, ...newConfig };
+      if (Object.keys(current).some(key => typeof updated[key as keyof EnvConfig] !== "string")) throw new Error("Settings must contain text values only");
+      if (updated.MCP_API_KEY.length < 32) throw new Error("MCP Bearer key must contain at least 32 characters");
+      if (!/^\d+$/.test(updated.PORT) || Number(updated.PORT) < 1 || Number(updated.PORT) > 65535) throw new Error("Port must be between 1 and 65535");
+      for (const key of ["COMMAND_TIMEOUT_MS", "MAX_OUTPUT_BYTES", "MAX_FILE_BYTES"] as const) if (!/^\d+$/.test(updated[key]) || Number(updated[key]) < 1) throw new Error("Server limits must be positive integers");
+      if (!["quick", "named"].includes(updated.CLOUDFLARE_MODE)) throw new Error("Invalid Cloudflare mode");
+      if (!["none", "ngrok", "tuna", "cloudflare", "localtunnel"].includes(updated.TUNNEL_PROVIDER)) throw new Error("Invalid tunnel provider");
+      updated.NGROK_ENABLED = updated.TUNNEL_PROVIDER === "ngrok" ? "true" : "false";
+      if (Object.values(updated).some(value => typeof value === "string" && /[\r\n]/.test(value))) throw new Error("Settings cannot contain line breaks");
+      if (updated.ALLOWED_HOSTS.split(";").some(host => host.trim() === "*")) throw new Error("Use specific allowed Host names, not a global wildcard");
       const envPath = this.getEnvPath();
 
       const lines = [
@@ -169,6 +187,16 @@ export class ServerManager {
         `PORT=${updated.PORT}`,
         `HOST=${updated.HOST}`,
         `ALLOWED_HOSTS=${updated.ALLOWED_HOSTS}`,
+        `TUNNEL_PROVIDER=${updated.TUNNEL_PROVIDER}`,
+        `TUNA_EXECUTABLE=${updated.TUNA_EXECUTABLE}`,
+        `TUNA_API_KEY=${updated.TUNA_API_KEY}`,
+        `TUNA_SUBDOMAIN=${updated.TUNA_SUBDOMAIN}`,
+        `CLOUDFLARED_EXECUTABLE=${updated.CLOUDFLARED_EXECUTABLE}`,
+        `CLOUDFLARE_MODE=${updated.CLOUDFLARE_MODE}`,
+        `CLOUDFLARE_TUNNEL_TOKEN=${updated.CLOUDFLARE_TUNNEL_TOKEN}`,
+        `CLOUDFLARE_PUBLIC_URL=${updated.CLOUDFLARE_PUBLIC_URL}`,
+        `LOCALTUNNEL_EXECUTABLE=${updated.LOCALTUNNEL_EXECUTABLE}`,
+        `LOCALTUNNEL_SUBDOMAIN=${updated.LOCALTUNNEL_SUBDOMAIN}`,
         `NGROK_ENABLED=${updated.NGROK_ENABLED}`,
         `NGROK_AUTHTOKEN=${updated.NGROK_AUTHTOKEN}`,
         `NGROK_DOMAIN=${updated.NGROK_DOMAIN}`,
@@ -179,7 +207,21 @@ export class ServerManager {
         `MAX_FILE_BYTES=${updated.MAX_FILE_BYTES}`,
       ];
 
-      await fs.writeFile(envPath, lines.join("\n") + "\n", "utf8");
+      // Quote literal values so #, spaces and Windows paths survive dotenv parsing.
+      const serialized = lines.map(line => {
+        const separator = line.indexOf("="); const value = line.slice(separator + 1);
+        const quote = ["'", "`", '"'].find(character => !value.includes(character));
+        if (!quote) throw new Error("A setting contains an unsupported combination of quotes");
+        return line.slice(0, separator + 1) + quote + value + quote;
+      });
+      // Preserve unrelated settings and comments rather than discarding them on save.
+      const existing = await fs.readFile(envPath, "utf8");
+      const keys = new Set(lines.map(line => line.slice(0, line.indexOf("="))));
+      const untouched = existing.split(/\r?\n/).filter(line => {
+        const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+        return !match || !keys.has(match[1]);
+      });
+      await fs.writeFile(envPath, [...untouched, ...serialized].join("\n").replace(/^\n+/, "") + "\n", "utf8");
       await this.reloadConfig();
       this.emitLog(`Configuration updated and saved to ${envPath}`, "info");
       return { success: true };
@@ -192,24 +234,38 @@ export class ServerManager {
 
   public async reloadConfig() {
     const config = await this.getEnvConfig();
+    if (this.process && !this.process.killed) return; // running values apply until restart
     this.updateStatus({
+      tunnelProvider: config.TUNNEL_PROVIDER,
+      tunnelState: "disabled",
+      tunnelUrl: undefined,
+      tunnelError: undefined,
       port: Number.parseInt(config.PORT, 10) || 3100,
       host: config.HOST || "127.0.0.1",
       apiKey: config.MCP_API_KEY || "",
       fullAccess: config.FULL_ACCESS === "true",
       filesRoot: config.FILES_ROOT || path.join(this.configDir, "workspace"),
-      ngrokEnabled: config.NGROK_ENABLED === "true",
+      ngrokEnabled: config.TUNNEL_PROVIDER === "ngrok",
       ngrokDomain: config.NGROK_DOMAIN || undefined,
     });
   }
 
-  public async start(): Promise<{ success: boolean; error?: string }> {
+  public start(): Promise<{ success: boolean; error?: string }> {
+    if (this.startTask) return this.startTask;
+    this.startTask = this.startProcess().finally(() => { this.startTask = null; });
+    return this.startTask;
+  }
+
+  private async startProcess(): Promise<{ success: boolean; error?: string }> {
     if (this.process && !this.process.killed) {
       return { success: true };
     }
 
-    await this.reloadConfig();
-    this.updateStatus({ state: "starting", error: undefined, ngrokUrl: undefined });
+    try { await this.reloadConfig(); } catch {
+      const error = "Unable to load server configuration. Check the local .env file and provider name.";
+      this.updateStatus({ state: "error", error }); return { success: false, error };
+    }
+    this.updateStatus({ state: "starting", error: undefined, ngrokUrl: undefined, tunnelUrl: undefined, tunnelError: undefined, tunnelState: this.status.tunnelProvider === "none" ? "disabled" : "starting" });
     this.emitLog("Starting MCP Terminal Server...", "info");
 
     const serverScript = path.join(this.projectRoot, "dist", "index.js");
@@ -243,6 +299,11 @@ export class ServerManager {
       });
 
       this.process.on("message", (message: unknown) => {
+        if (message && typeof message === "object" && (message as {type?: string}).type === "server:ready") this.updateStatus({ state: "running" });
+        if (message && typeof message === "object" && (message as {type?: string}).type === "tunnel:status") {
+          const m = message as {provider: ServerStatus["tunnelProvider"]; state: ServerStatus["tunnelState"]; url?: string; error?: string};
+          this.updateStatus({ tunnelProvider: m.provider, tunnelState: m.state, tunnelUrl: m.url, tunnelError: m.error, ngrokUrl: m.provider === "ngrok" ? m.url : undefined });
+        }
         if (this.monitoringEnabled && message && typeof message === "object" && (message as {type?: string}).type === "monitor:snapshot") {
           this.monitorCallback?.((message as {snapshot: MonitorSnapshot}).snapshot);
         }
@@ -264,29 +325,30 @@ export class ServerManager {
         this.process = null;
         this.updateStatus({
           state: code === 0 || !wasRunning ? "offline" : "error",
-          ngrokUrl: undefined,
+          ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined,
         });
         this.emitLog(`MCP Server stopped (exit code: ${code})`, code === 0 ? "info" : "warn");
       });
 
       this.process.on("error", (err) => {
         this.process = null;
-        this.updateStatus({ state: "error", error: err.message, ngrokUrl: undefined });
+        this.updateStatus({ state: "error", error: err.message, ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined });
         this.emitLog(`Process error: ${err.message}`, "error");
       });
 
       return { success: true };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      this.updateStatus({ state: "error", error, ngrokUrl: undefined });
+      this.updateStatus({ state: "error", error, ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined });
       this.emitLog(`Failed to spawn server process: ${error}`, "error");
       return { success: false, error };
     }
   }
 
   public async stop(): Promise<{ success: boolean }> {
+    if (this.startTask) await this.startTask;
     if (!this.process || this.process.killed) {
-      this.updateStatus({ state: "offline", ngrokUrl: undefined });
+      this.updateStatus({ state: "offline", ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined });
       return { success: true };
     }
 
@@ -305,7 +367,7 @@ export class ServerManager {
         resolved = true;
         clearTimeout(forceKillTimer);
         this.process = null;
-        this.updateStatus({ state: "offline", ngrokUrl: undefined });
+        this.updateStatus({ state: "offline", ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined });
         resolve({ success: true });
       };
 
@@ -383,18 +445,6 @@ export class ServerManager {
       if (line.startsWith("[Ngrok]")) {
         const isNgrokError = line.includes("failed") || line.includes("error");
         this.emitLog(line, isNgrokError ? "warn" : "info", "general", line);
-        continue;
-      }
-
-      const ngrokMatch = line.match(/URL to paste into Notion:\s*(https:\/\/[^\s]+)/i);
-      if (ngrokMatch) {
-        let url = ngrokMatch[1].trim();
-        // If the logged URL ends with /mcp, extract the base domain URL
-        if (url.endsWith("/mcp")) {
-          url = url.slice(0, -4);
-        }
-        this.updateStatus({ ngrokUrl: url });
-        this.emitLog(`Public Ngrok Tunnel Ready: ${url}`, "mcp");
         continue;
       }
 

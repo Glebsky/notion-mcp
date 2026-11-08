@@ -1,6 +1,7 @@
 import React from "react";
 import { Play, Square, RotateCw, Settings, FolderOpen } from "lucide-react";
 import type { ServerStatus } from "../../types";
+import { Button } from "../lib/shadcn/ui";
 
 
 
@@ -32,7 +33,7 @@ export const Controls: React.FC<ControlsProps> = ({
             disabled={isStarting}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-xs tracking-wide shadow-lg shadow-emerald-500/20 border border-emerald-400/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
-            <Play className={`w-4 h-4 fill-white ${isStarting ? "animate-spin" : ""}`} />
+            <Play className={`w-4 h-4 fill-white ${isStarting ? "animate-spin functional-motion" : ""}`} />
             <span>{isStarting ? "Starting MCP..." : "Start Server"}</span>
           </button>
         ) : (
@@ -65,13 +66,7 @@ export const Controls: React.FC<ControlsProps> = ({
         </div>
 
         {/* Settings Button */}
-        <button
-          onClick={onOpenSettings}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl liquid-glass-btn text-xs font-medium text-slate-300 hover:text-white"
-        >
-          <Settings className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Settings (.env)</span>
-        </button>
+        <Button onClick={onOpenSettings} aria-haspopup="dialog"><Settings size={16}/><span>Settings</span></Button>
       </div>
     </div>
   );

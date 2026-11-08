@@ -1,0 +1,36 @@
+/* Preserve the cyan/violet Liquid Glass identity in both system color schemes. */
+:root:root {
+  color-scheme: light;
+  --background: 216 45% 96%; --foreground: 219 40% 17%;
+  --card: 215 55% 98%; --card-foreground: 219 40% 17%;
+  --muted: 216 30% 91%; --muted-foreground: 218 22% 39%;
+  --primary: 189 76% 31%; --primary-foreground: 0 0% 100%;
+  --secondary: 261 47% 46%; --border: 216 29% 78%;
+  --input: 216 32% 89%; --ring: 189 76% 34%;
+  --destructive: 354 65% 42%; --warning: 32 83% 30%; --success: 162 74% 27%;
+  --glass-shadow: 217 45% 36%; --radius: 1rem;
+}
+:root.dark {
+  color-scheme: dark;
+  --background: 221 49% 9%; --foreground: 216 100% 96%;
+  --card: 220 43% 13%; --card-foreground: 216 100% 96%;
+  --muted: 216 30% 20%; --muted-foreground: 213 24% 70%;
+  --primary: 187 72% 71%; --primary-foreground: 221 50% 11%;
+  --secondary: 259 80% 78%; --border: 217 27% 31%;
+  --input: 220 39% 10%; --ring: 187 72% 71%;
+  --destructive: 350 94% 79%; --warning: 38 91% 74%; --success: 159 65% 72%;
+  --glass-shadow: 222 70% 3%;
+}
+@media (prefers-color-scheme: dark) {
+  :root:root:not(.light) {
+    color-scheme: dark;
+    --background: 221 49% 9%; --foreground: 216 100% 96%;
+    --card: 220 43% 13%; --card-foreground: 216 100% 96%;
+    --muted: 216 30% 20%; --muted-foreground: 213 24% 70%;
+    --primary: 187 72% 71%; --primary-foreground: 221 50% 11%;
+    --secondary: 259 80% 78%; --border: 217 27% 31%;
+    --input: 220 39% 10%; --ring: 187 72% 71%;
+    --destructive: 350 94% 79%; --warning: 38 91% 74%; --success: 159 65% 72%;
+    --glass-shadow: 222 70% 3%;
+  }
+}
