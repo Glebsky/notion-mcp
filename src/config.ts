@@ -3,9 +3,9 @@ import * as path from "node:path";
 import dotenv from "dotenv";
 
 if (process.env.DOTENV_PATH) {
-  dotenv.config({ path: process.env.DOTENV_PATH });
+  dotenv.config({ path: process.env.DOTENV_PATH, quiet: true });
 } else {
-  dotenv.config();
+  dotenv.config({ quiet: true });
 }
 
 
